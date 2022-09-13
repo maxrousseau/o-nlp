@@ -11,7 +11,9 @@ from torch.utils.data import DataLoader
 
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 from transformers import default_data_collator
+from transformers import get_scheduler
 
+from accelerate import Accelerator
 
 from datasets import load_metric
 
@@ -24,7 +26,7 @@ np.random.seed(0)
 # This will be moved to cli.py
 default_config = {
     "lr": 2e-5,
-    "num_epochs": 1,
+    "num_epochs": 2,
     "lr_scheduler": True,
     "checkpoint": "dmis-lab/biobert-base-cased-v1.1-squad",
     "checkpoint_savedir": "./ckpt",
@@ -38,15 +40,15 @@ default_config = {
 
 
 class OrthoBert:
-    ''''''
+    """"""
 
     FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
     logging.basicConfig(format=FORMAT)
-    logger = logging.getLogger('bert')
-    logger.setLevel(logging.DEBUG) # change level if debug or not
+    logger = logging.getLogger("bert")
+    logger.setLevel(logging.DEBUG)  # change level if debug or not
 
     def __init__(self, **kwargs):
-        '''base configuration for the BERT model, include default training parameters as well'''
+        """base configuration for the BERT model, include default training parameters as well"""
         # model/training/inference configuration
         self.lr = kwargs["lr"]
         self.num_epochs = kwargs["num_epochs"]
@@ -72,12 +74,12 @@ class OrthoBert:
         """
         Initialize the model with the desired mode (MLM or QA)
         """
-        if mode == 'qa':
+        if mode == "qa":
             self.tokenizer = AutoTokenizer.from_pretrained(self.checkpoint)
             self.model = AutoModelForQuestionAnswering.from_pretrained(self.checkpoint)
             self.logger.info("qa model initialized")
 
-        if mode == 'mlm':
+        if mode == "mlm":
             None
 
     def __training_preprocessing(self, examples):
@@ -97,7 +99,7 @@ class OrthoBert:
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             padding="max_length",
-           )
+        )
 
         offset_mapping = inputs.pop("offset_mapping")
         sample_map = inputs.pop("overflow_to_sample_mapping")
@@ -123,7 +125,10 @@ class OrthoBert:
             context_end = idx - 1
 
             # If the answer is not fully inside the context, label is (0, 0)
-            if offset[context_start][0] > start_char or offset[context_end][1] < end_char:
+            if (
+                offset[context_start][0] > start_char
+                or offset[context_end][1] < end_char
+            ):
                 start_positions.append(0)
                 end_positions.append(0)
 
@@ -146,10 +151,10 @@ class OrthoBert:
 
     def __evaluation_preprocessing(self, examples):
         """
-            preprocessing for evalutation samples (validation and test)
-            return:
-            inputs:
-            features ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id']
+        preprocessing for evalutation samples (validation and test)
+        return:
+        inputs:
+        features ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id']
         """
         questions = [q.strip() for q in examples["question"]]
         inputs = self.tokenizer(
@@ -161,7 +166,7 @@ class OrthoBert:
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             padding="max_length",
-           )
+        )
 
         sample_map = inputs.pop("overflow_to_sample_mapping")
         example_ids = []
@@ -203,8 +208,8 @@ class OrthoBert:
                 end_logit = end_logits[feature_index]
                 offsets = features[feature_index]["offset_mapping"]
 
-                start_indexes = np.argsort(start_logit)[-1: -n_best - 1: -1].tolist()
-                end_indexes = np.argsort(end_logit)[-1 :-n_best - 1: -1].tolist()
+                start_indexes = np.argsort(start_logit)[-1 : -n_best - 1 : -1].tolist()
+                end_indexes = np.argsort(end_logit)[-1 : -n_best - 1 : -1].tolist()
 
                 for start_index in start_indexes:
                     for end_index in end_indexes:
@@ -218,9 +223,10 @@ class OrthoBert:
 
                         answer = {
                             "text": context[
-                                offsets[start_index][0]: offsets[end_index][1]
+                                offsets[start_index][0] : offsets[end_index][1]
                             ],
-                            "logit_score": start_logit[start_index] + end_logit[end_index],
+                            "logit_score": start_logit[start_index]
+                            + end_logit[end_index],
                         }
                         answers.append(answer)
 
@@ -236,17 +242,19 @@ class OrthoBert:
             {"id": ex["id"], "answers": ex["answers"]} for ex in examples
         ]
 
-        return self.metric.compute(predictions=predicted_answers, references=theoretical_answers)
+        return self.metric.compute(
+            predictions=predicted_answers, references=theoretical_answers
+        )
 
     def preprocess(self, examples, type=None):
-        '''specify type of preprocessing (train or eval)'''
+        """specify type of preprocessing (train or eval)"""
 
         if type == "training":
             self.proc_train_dataset = examples.map(
                 self.__training_preprocessing,
                 batched=True,
                 remove_columns=examples.column_names,
-                )
+            )
 
             train_tensor = self.proc_train_dataset
             train_tensor.set_format("torch")
@@ -263,10 +271,12 @@ class OrthoBert:
             self.proc_test_dataset = examples.map(
                 self.__evaluation_preprocessing,
                 batched=True,
-                remove_columns=examples.column_names
+                remove_columns=examples.column_names,
             )
 
-            test_tensor = self.proc_test_dataset.remove_columns(["example_id", "offset_mapping"])
+            test_tensor = self.proc_test_dataset.remove_columns(
+                ["example_id", "offset_mapping"]
+            )
             test_tensor.set_format("torch")
             self.test_dataloader = DataLoader(
                 test_tensor,
@@ -277,21 +287,88 @@ class OrthoBert:
             self.logger.info("validation dataset processed and dataloaders created")
 
         else:
-            self.logger.error("preprocessing requires valide type training or validation")
+            self.logger.error(
+                "preprocessing requires valide type training or validation"
+            )
 
-    def finetune(self):
-        print("hello")
+    def finetune(self, mode):
+        # load the model
+        self.__model_initialization(mode)
+
+        # preprocessing
+        self.preprocess(self.train_dataset, "training")
+        self.preprocess(self.test_dataset, "validation")
+
+        # fine-tuning
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+
+        accelerator = Accelerator(fp16=True)
+        model, optimizer, train_dataloader, test_dataloader = accelerator.prepare(
+            self.model, optimizer, self.train_dataloader, self.test_dataloader
+        )
+
+        num_update_steps_per_epoch = len(train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+        lr_scheduler = get_scheduler(
+            "linear",
+            optimizer=optimizer,
+            num_warmup_steps=0,
+            num_training_steps=num_training_steps,
+        )
+
+        progressbar = tqdm(range(num_training_steps))
+        for epoch in range(self.num_epochs):
+            model.train()  # this just sets the torch model to train
+            for steps, batch in enumerate(self.train_dataloader):
+                outputs = model(**batch)
+                loss = outputs.loss
+                accelerator.backward(loss)  # backprop here
+
+                # zero gradient and update Lr and optimizer
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
+
+            # eval after epoch
+            model.eval()
+            start_logits = []
+            end_logits = []
+            print("Evaluation")  # use accelarator.print() if you only want to
+            # print once when training on multiple machines
+
+            for batch in tqdm(self.test_dataloader):
+                with torch.no_grad():
+                    outputs = model(**batch)
+
+                start_logits.append(
+                    accelerator.gather(outputs.start_logits).cpu().numpy()
+                )
+                end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
+
+                # hf bert models use classes format outputs
+                # https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py#:~:text=return%20QuestionAnsweringModelOutput(,)
+            # ? what is the point of this code...
+            start_logits = np.concatenate(start_logits)
+            end_logits = np.concatenate(end_logits)
+            start_logits = start_logits[: len(self.proc_test_dataset)]
+            end_logits = end_logits[: len(self.proc_test_dataset)]
+            metrics = self.__answerFromLogit(
+                start_logits, end_logits, self.proc_test_dataset, self.test_dataset
+            )
+            print(f"epoch {epoch}:", metrics)
+            accelerator.wait_for_everyone()
 
     def debug(self, mode):
         # set debug parameters for epochs
         self.num_epochs = 1
 
+        # load the model Ok
+        self.__model_initialization(mode)
+
         # preprocessing :: Ok
         self.preprocess(self.train_dev_dataset, "training")
         self.preprocess(self.val_dev_dataset, "validation")
-
-        # load the model Ok
-        self.__model_initialization(mode)
 
         # check fine-tuning
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
@@ -299,9 +376,8 @@ class OrthoBert:
 
         # @HERE :: @TODO implement fine tuning function, then move on to pretraining/eval/run, then do the same for BART(read fewshot paper and code in detail beforehand)
 
+    # def pretrain():
 
-    #def pretrain():
+    # def evaluate():
 
-    #def evaluate():
-
-    #def run():
+    # def run():
