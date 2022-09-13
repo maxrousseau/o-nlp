@@ -7,7 +7,7 @@ def load_bioasq(train_path, test_path):
     Load the bioasq dataset from json, split and transform into pytorch/hf Dataset objects import typer
 
     """
-    # @NOTE :: we consider that the dataset to be loaded will contain the following fields
+    # note :: we consider that the dataset to be loaded will contain the following fields
     #   also it will be pre-shuffled to ease the splitting processs
     f_train = open(train_path, "rb")
     train_raw = json.load(f_train)
@@ -58,7 +58,7 @@ def load_mini_oqa(train_path, test_path):
     Load the mini oqa dataset from json, split and transform into pytorch/hf Dataset objects import typer
 
     """
-    # @NOTE :: we consider that the dataset to be loaded will contain the following fields
+    # note :: we consider that the dataset to be loaded will contain the following fields
     #   also it will be pre-shuffled to ease the splitting processs
     f_train = open(train_path, "rb")
     train_raw = json.load(f_train)

@@ -18,7 +18,7 @@ from accelerate import Accelerator
 from datasets import load_metric
 
 
-# @NOTE :: set seed from cli
+# note :: set seed from cli
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
@@ -230,18 +230,15 @@ class OrthoBert:
                         }
                         answers.append(answer)
 
-        if len(answers) > 0:
-            best_answer = max(answers, key=lambda x: x["logit_score"])
-            predicted_answers.append(
-                {"id": example_id, "prediction_text": best_answer["text"]}
-            )
-        else:
-            predicted_answers.append({"id": example_id, "prediction_text": ""})
+            if len(answers) > 0:
+                best_answer = max(answers, key=lambda x: x["logit_score"])
+                predicted_answers.append({"id": example_id, "prediction_text": best_answer["text"]})
+            else:
+                predicted_answers.append({"id": example_id, "prediction_text": ""})
 
         theoretical_answers = [
             {"id": ex["id"], "answers": ex["answers"]} for ex in examples
         ]
-
         return self.metric.compute(
             predictions=predicted_answers, references=theoretical_answers
         )
@@ -303,11 +300,12 @@ class OrthoBert:
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
 
         accelerator = Accelerator(fp16=True)
-        model, optimizer, train_dataloader, test_dataloader = accelerator.prepare(
+
+        self.model, optimizer, self.train_dataloader, self.test_dataloader = accelerator.prepare(
             self.model, optimizer, self.train_dataloader, self.test_dataloader
         )
 
-        num_update_steps_per_epoch = len(train_dataloader)
+        num_update_steps_per_epoch = len(self.train_dataloader)
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
         lr_scheduler = get_scheduler(
             "linear",
@@ -318,9 +316,9 @@ class OrthoBert:
 
         progressbar = tqdm(range(num_training_steps))
         for epoch in range(self.num_epochs):
-            model.train()  # this just sets the torch model to train
+            self.model.train()  # this just sets the torch model to train
             for steps, batch in enumerate(self.train_dataloader):
-                outputs = model(**batch)
+                outputs = self.model(**batch)
                 loss = outputs.loss
                 accelerator.backward(loss)  # backprop here
 
@@ -330,8 +328,10 @@ class OrthoBert:
                 optimizer.zero_grad()
                 progressbar.update(1)
 
+
+            self.logger.info("epoch {} :: Ok".format(epoch))
             # eval after epoch
-            model.eval()
+            self.model.eval()
             start_logits = []
             end_logits = []
             print("Evaluation")  # use accelarator.print() if you only want to
@@ -339,7 +339,7 @@ class OrthoBert:
 
             for batch in tqdm(self.test_dataloader):
                 with torch.no_grad():
-                    outputs = model(**batch)
+                    outputs = self.model(**batch)
 
                 start_logits.append(
                     accelerator.gather(outputs.start_logits).cpu().numpy()
@@ -374,7 +374,7 @@ class OrthoBert:
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         self.logger.info("optimizer set")
 
-        # @HERE :: @TODO implement fine tuning function, then move on to pretraining/eval/run, then do the same for BART(read fewshot paper and code in detail beforehand)
+        # here :: todo implement fine tuning function, then move on to pretraining/eval/run, then do the same for BART(read fewshot paper and code in detail beforehand)
 
     # def pretrain():
 
