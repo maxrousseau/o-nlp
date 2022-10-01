@@ -24,7 +24,7 @@ random.seed(0)
 np.random.seed(0)
 
 # This will be moved to cli.py
-default_config = {
+bert_default_config = {
     "lr": 2e-5,
     "num_epochs": 2,
     "lr_scheduler": True,
@@ -98,7 +98,7 @@ class OrthoBert:
             stride=self.stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            padding="max_length",
+            padding="max_lengt",
         )
 
         offset_mapping = inputs.pop("offset_mapping")
@@ -232,7 +232,9 @@ class OrthoBert:
 
             if len(answers) > 0:
                 best_answer = max(answers, key=lambda x: x["logit_score"])
-                predicted_answers.append({"id": example_id, "prediction_text": best_answer["text"]})
+                predicted_answers.append(
+                    {"id": example_id, "prediction_text": best_answer["text"]}
+                )
             else:
                 predicted_answers.append({"id": example_id, "prediction_text": ""})
 
@@ -301,7 +303,12 @@ class OrthoBert:
 
         accelerator = Accelerator(fp16=True)
 
-        self.model, optimizer, self.train_dataloader, self.test_dataloader = accelerator.prepare(
+        (
+            self.model,
+            optimizer,
+            self.train_dataloader,
+            self.test_dataloader,
+        ) = accelerator.prepare(
             self.model, optimizer, self.train_dataloader, self.test_dataloader
         )
 
@@ -327,7 +334,6 @@ class OrthoBert:
                 lr_scheduler.step()
                 optimizer.zero_grad()
                 progressbar.update(1)
-
 
             self.logger.info("epoch {} :: Ok".format(epoch))
             # eval after epoch

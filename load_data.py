@@ -102,3 +102,41 @@ def load_mini_oqa(train_path, test_path):
     test_set = Dataset.from_dict(test_dict, split="test")
 
     return (dev_train_set, val_set, full_train_set, test_set)
+
+
+def formatToMI(dataset):
+    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
+    "Question: a question? Answer: <mask>. Context: this is the context"
+
+    USAGE:
+        train_raw = Dataset.from_dict(formatToMI(dset[2]))
+        test_raw = Dataset.from_dict(formatToMI(dset[3]))
+
+        # then you can feed those to the FsBART model class at initialization to run
+    """
+    masked_strings = []
+    full_strings = []
+    qa_strings = []
+    answer_strings = []
+
+    for i in range(len(dataset)):
+        question = dataset["question"][i]
+        answer = dataset["answers"][i]["text"][0]
+        context = dataset["context"][i]
+
+        masked_strings.append(
+            "Question: {} Answer: <mask>. Context: {}".format(question, context)
+        )
+        full_strings.append(
+            "Question: {} Answer: {}. Context: {}".format(question, answer, context)
+        )
+        qa_strings.append("Question: {} Answer: {}.".format(question, answer))
+        answer_strings.append(answer)
+
+    return {
+        "masked_strings": masked_strings,
+        "full_strings": full_strings,
+        "qa_strings": qa_strings,
+        "answer_strings": answer_strings,
+        "id": dataset["id"],
+    }
