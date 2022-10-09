@@ -140,3 +140,32 @@ def formatToMI(dataset):
         "answer_strings": answer_strings,
         "id": dataset["id"],
     }
+
+
+# @TODO -- determine if more elaborate function needed...
+def loadOQAforRetrieval(path):
+    """ """
+    f = open(path, "rb")
+    samples = json.load(f)
+    f.close()
+    return samples
+
+
+def loadCorpus(corpus_path):
+    """ """
+    corpus = []  # just a list of strings, each string is a page from an article
+    corpus_keys = []  # list of dicts correstponding to the passage above
+    # {article_id : "", page: 0}
+
+    with open(corpus_path, "rb") as f:
+        raw_corpus = json.load(f)
+        for p in raw_corpus:
+            key = p["article_id"]
+            page = 1
+
+            for c in p["content"]:
+                corpus.append(c)
+                corpus_keys.append({"article_id": key, "page": page})
+                page += 1
+
+    return (corpus, corpus_keys)
