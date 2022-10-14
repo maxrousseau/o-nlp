@@ -248,7 +248,7 @@ class FsBART:
             self.proc_train_dataset = examples.map(
                 self.__training_preprocessing,
                 batched=True,
-                remove_columns=train_raw.column_names,
+                remove_columns=examples.column_names,
             )
             train_tensor = self.proc_train_dataset
             train_tensor.set_format("torch")
@@ -264,7 +264,7 @@ class FsBART:
             self.proc_test_dataset = examples.map(
                 self.__evaluation_preprocessing,
                 batched=True,
-                remove_columns=test_raw.column_names,
+                remove_columns=examples.column_names,
             )
             test_tensor = self.proc_test_dataset
             test_tensor.set_format("torch")
