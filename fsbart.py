@@ -337,6 +337,7 @@ class FsBART:
                     )
 
             score = self.__eval(eval_outputs, self.test_dataset)
+            f1_score = score["f1"]
             print(
                 "Epoch: {}, Loss: {}, Validation F1: {}".format(
                     epoch, float(loss.cpu()), score
