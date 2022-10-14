@@ -86,7 +86,7 @@ class Retriever:
 
         return ranked_keys
 
-    def eval(self):
+    def eval(self, k=10):
 
         # preprocess queries
         self.__preprocessQueries()
@@ -98,7 +98,6 @@ class Retriever:
         # evaluate on queries and labels
         total = len(self.queries)
         correct_doc = 0
-        k = 20
 
         for i in tqdm(range(len(self.queries))):
             top_k = self.rankTopK(self.queries[i], k)
