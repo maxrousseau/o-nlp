@@ -104,7 +104,7 @@ class OrthoBert:
             stride=self.stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            padding="max_lengt",
+            padding="max_length",
         )
 
         offset_mapping = inputs.pop("offset_mapping")
