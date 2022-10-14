@@ -105,7 +105,7 @@ class Retriever:
                 correct_doc += 1
 
         score = 100 * (correct_doc / total)
-        print("top-{} accuracy for retrival: {}%".format(str(k), score))
+        print("top-{} accuracy for retrieval: {}%".format(str(k), score))
 
 
 # example usage ###############################################################
