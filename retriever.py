@@ -67,7 +67,12 @@ class Retriever:
 
             self.queries[idx] = q
 
-    def __initializeModel(self):
+    def initialize(self):
+        # preprocess queries
+        self.__preprocessQueries()
+        self.__preprocessCorpus()
+
+        # initialize model
         self.bm25 = BM25Plus(self.corpus)
 
     def rankTopK(self, query, k):
@@ -87,13 +92,6 @@ class Retriever:
         return ranked_keys
 
     def eval(self, k=10):
-
-        # preprocess queries
-        self.__preprocessQueries()
-        self.__preprocessCorpus()
-
-        # initialize model
-        self.__initializeModel()
 
         # evaluate on queries and labels
         total = len(self.queries)
