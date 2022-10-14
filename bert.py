@@ -1,6 +1,7 @@
 import logging
 import collections
 import random
+
 import numpy as np
 
 from tqdm.auto import tqdm
@@ -18,12 +19,17 @@ from accelerate import Accelerator
 from datasets import load_metric
 
 
+###############################################################################
+#                             BERT Implementation                             #
+###############################################################################
+
+
 # note :: set seed from cli
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
 
-# This will be moved to cli.py
+
 bert_default_config = {
     "lr": 2e-5,
     "num_epochs": 2,
@@ -298,6 +304,8 @@ class OrthoBert:
         self.preprocess(self.train_dataset, "training")
         self.preprocess(self.test_dataset, "validation")
 
+        best_f1 = 0
+
         # fine-tuning
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
 
@@ -363,7 +371,18 @@ class OrthoBert:
                 start_logits, end_logits, self.proc_test_dataset, self.test_dataset
             )
             print(f"epoch {epoch}:", metrics)
+            f1_score = metrics["f1"]
             accelerator.wait_for_everyone()
+
+            # save the best model
+            # @TODO -- model checkpoint saving needs to be refined!!!
+            if f1_score > best_f1:
+                best_f1 = f1_score
+                self.model.save_pretrained("./top_bert.bin")
+                self.logger.info("new best model saved!")
+
+        print("Best model f1 = {}".format(best_f1))
+        return best_f1
 
     def debug(self, mode):
         # set debug parameters for epochs
@@ -380,7 +399,7 @@ class OrthoBert:
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         self.logger.info("optimizer set")
 
-        # here :: todo implement fine tuning function, then move on to pretraining/eval/run, then do the same for BART(read fewshot paper and code in detail beforehand)
+        # @NOTE :: implement pretraining/eval/run, then do the same for BART(read fewshot paper and code in detail beforehand)
 
     # def pretrain():
 

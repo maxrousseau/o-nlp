@@ -1,5 +1,8 @@
 from rank_bm25 import BM25Plus
 from nltk.corpus import stopwords
+from nltk.stem.snowball import SnowballStemmer
+
+from tqdm.auto import tqdm
 
 import logging
 
@@ -16,7 +19,9 @@ class Retriever:
     # logger = logging.getLogger("bert")
     # logger.setLevel(logging.DEBUG)  # change level if debug or not
 
-    def __init__(self, corpus, corpus_keys, queries, labels=None, rm_stopwords=True):
+    def __init__(
+        self, corpus, corpus_keys, queries, labels=None, rm_stopwords=False, stem=False
+    ):
         self.corpus = corpus
         self.corpus_keys = corpus_keys
         self.queries = queries  # @NOTE :: queries contain question only because
@@ -26,14 +31,16 @@ class Retriever:
         # @TODO :: add options to change
         # @TODO :: add stemming/lemmatization and stopword removal
         self.lemma = False
+        self.stem = stem
         self.rm_stopwords = rm_stopwords
         self.lowercase = True
         self.bm25 = None
 
         self.stopwords = set(stopwords.words("english"))
+        self.stemmer = SnowballStemmer("english")
 
     def __preprocessCorpus(self):
-        for idx in range(len(self.corpus)):
+        for idx in tqdm(range(len(self.corpus))):
             c = self.corpus[idx]
             c = c.lower()
             c = c.split(" ")
@@ -41,16 +48,22 @@ class Retriever:
             if self.rm_stopwords:
                 c = [w for w in c if not w in self.stopwords]
 
+            if self.stem:
+                c = [self.stemmer.stem(w) for w in c]
+
             self.corpus[idx] = c
 
     def __preprocessQueries(self):
-        for idx in range(len(self.queries)):
+        for idx in tqdm(range(len(self.queries))):
             q = self.queries[idx]
             q = q.lower()
             q = q.split(" ")
 
             if self.rm_stopwords:
                 q = [w for w in q if not w in self.stopwords]
+
+            if self.stem:
+                q = [self.stemmer.stem(w) for w in q]
 
             self.queries[idx] = q
 
@@ -85,9 +98,9 @@ class Retriever:
         # evaluate on queries and labels
         total = len(self.queries)
         correct_doc = 0
-        k = 50
+        k = 20
 
-        for i in range(len(self.queries)):
+        for i in tqdm(range(len(self.queries))):
             top_k = self.rankTopK(self.queries[i], k)
             top_k_ids = [i["article_id"] for i in top_k]
 
@@ -98,18 +111,21 @@ class Retriever:
         print("top-{} accuracy for retrival: {}%".format(str(k), score))
 
 
-def testFunc():
-    import load_data
-
-    corpus_path = "C:/Users/roum5/source/data/angle_corpus/parsed_papers_6063.json"
-    dataset_path = "C:/Users/roum5/source/data/oqa_v0.1_prelim/oqa_v0.1_retrieval.json"
-
-    corpus, corpus_key = load_data.loadCorpus(corpus_path)
-    dataset = load_data.loadOQAforRetrieval(dataset_path)
-
-    queries = [i["question"] for i in dataset]
-    labels = [i["context_key"] for i in dataset]
-
-    rtrvr = Retriever(corpus, corpus_key, queries, labels=labels, rm_stopwords=True)
-    # @NOTE :: interestingly stopword removal hurts performance at k=20 and at K=50
-    rtrvr.eval()
+# example usage ###############################################################
+#
+# import load_data
+#
+# corpus_path = "C:/Users/roum5/source/data/angle_corpus/parsed_papers_6063.json"
+# dataset_path = "C:/Users/roum5/source/data/oqa_v0.1_prelim/oqa_v0.1_retrieval.json"
+#
+# corpus, corpus_key = load_data.loadCorpus(corpus_path)
+# dataset = load_data.loadOQAforRetrieval(dataset_path)
+#
+# queries = [i["question"] for i in dataset]
+# labels = [i["context_key"] for i in dataset]
+#
+# rtrvr = Retriever(
+#     corpus, corpus_key, queries, labels=labels, stem=True, rm_stopwords=True
+# )
+#
+# rtrvr.eval()

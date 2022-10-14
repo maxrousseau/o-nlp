@@ -29,7 +29,7 @@ torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
 
-# default config
+
 bart_default_config = {
     "lr": 2e-5,
     "num_epochs": 12,
@@ -286,6 +286,8 @@ class FsBART:
         self.__preprocess(self.train_dataset, "training")
         self.__preprocess(self.test_dataset, "validation")
 
+        best_f1 = 0
+
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
 
         # setup for GPU
@@ -341,11 +343,17 @@ class FsBART:
                 )
             )
 
-            # out of nowhere, I just got 59% F1? 65.5%, 66%, 68!
-            # this stuff seems to be very sensitive to hyperparams (batch 4, lr 2e-5)
+            # save the best model
+            if f1_score > best_f1:
+                best_f1 = f1_score
+                self.model.save_pretrained("./top_bart.bin")
+                self.logger.info("new best model saved!")
 
+        # final eval
+        print("Best model f1 = {}".format(best_f1))
+        return best_f1
         # HERE - TODO
-        # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the pape
+        # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
         # def run(self, ):
         """run model for inference only"""
