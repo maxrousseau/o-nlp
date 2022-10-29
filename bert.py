@@ -80,7 +80,7 @@ class OrthoBert:
         self.metric = load_metric("squad")
 
     def __seed_worker(worker_id):
-        worker_seed = torch.initial_seed % 2 ** 32
+        worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
