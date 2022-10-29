@@ -25,6 +25,7 @@ from datasets import load_metric
 
 
 bert_default_config = {
+    "name": "bert-default",
     "lr": 2e-5,
     "num_epochs": 2,
     "lr_scheduler": True,
@@ -51,6 +52,7 @@ class OrthoBert:
     def __init__(self, **kwargs):
         """base configuration for the BERT model, include default training parameters as well"""
         # model/training/inference configuration
+        self.name = kwargs["name"]
         self.lr = kwargs["lr"]
         self.num_epochs = kwargs["num_epochs"]
         self.checkpoint = kwargs["checkpoint"]
@@ -320,6 +322,8 @@ class OrthoBert:
             )
 
     def finetune(self, mode):
+        local_path = os.path.abspath("./{}-{}.bin".format(self.name, int(time.time())))
+
         # load the model
         self.__model_initialization(mode)
 
@@ -402,10 +406,14 @@ class OrthoBert:
             # @TODO -- model checkpoint saving needs to be refined!!!
             if f1_score > best_f1:
                 best_f1 = f1_score
-                self.model.save_pretrained("./top_bert.bin")
+                self.model.save_pretrained(local_path)
                 self.logger.info("new best model saved!")
 
         print("Best model f1 = {}".format(best_f1))
+
+        self.model.from_pretrained(local_path, local_files_only=True)
+        self.logger.info("best model reloaded!")
+
         return best_f1
 
     def debug(self, mode):
@@ -429,16 +437,22 @@ class OrthoBert:
 
     # def evaluate():
 
-    def run(self, mode, init=True, evalutate=True):
+    def run(self, mode, init=False, evalutate=True):
         """if eval is true then simply return the F1 score otherwise return the predicted output vs"""
         # load the model
         #  TODO :: make reinitialization optional, however then the initialization and preprocessing should be
         # contained in a separate function .setup() so that the user can either finetune() or run()
 
-        if init:
-            self.__model_initialization(mode)
-            # preprocessing only validation
-            self.preprocess(self.test_dataset, "validation")
+        try:
+            if init:
+                self.__model_initialization(mode)
+                # preprocessing only validation
+                self.preprocess(self.test_dataset, "validation")
+                self.logger.info("new model initialized")
+            else:
+                self.logger.info("using current model")
+        except:
+            self.logger.error("model initialization error")
 
         self.model.eval()
         start_logits = []
@@ -464,4 +478,5 @@ class OrthoBert:
             start_logits, end_logits, self.proc_test_dataset, self.test_dataset
         )
         f1_score = metrics["f1"]
+
         return f1_score, predictions, targets
