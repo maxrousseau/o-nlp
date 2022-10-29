@@ -395,7 +395,7 @@ class OrthoBert:
             end_logits = np.concatenate(end_logits)
             start_logits = start_logits[: len(self.proc_test_dataset)]
             end_logits = end_logits[: len(self.proc_test_dataset)]
-            metrics = self.__answerFromLogit(
+            metrics, unused, unused = self.__answerFromLogit(
                 start_logits, end_logits, self.proc_test_dataset, self.test_dataset
             )
             print(f"epoch {epoch}:", metrics)
