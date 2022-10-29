@@ -1,11 +1,15 @@
 from load_data import load_mini_oqa
 from bert import OrthoBert
-from bert import default_config
+from bert import bert_default_config
 
 import os
 
-train = os.path.abspath("/home/max/datasets/mini-oqa/oqa_v0.1_train.json")
-test = os.path.abspath("/home/max/datasets/mini-oqa/oqa_v0.1_test.json")
+# train = os.path.abspath("/home/max/datasets/mini-oqa/oqa_v0.1_train.json")
+# test = os.path.abspath("/home/max/datasets/mini-oqa/oqa_v0.1_test.json")
+
+train = os.path.abspath("c:/Users/roum5/source/data/oqa_v0.1_prelim/oqa_v0.1_test.json")
+test = os.path.abspath("c:/Users/roum5/source/data/oqa_v0.1_prelim/oqa_v0.1_test.json")
+
 # train = os.path.abspath("/home/max/datasets/bioasq9b-dummy/bioasq_9b_train.json")
 # test = os.path.abspath("/home/max/datasets/bioasq9b-dummy/bioasq_9b_test.json")
 

@@ -24,12 +24,6 @@ from datasets import load_metric
 ###############################################################################
 
 
-# note :: set seed from cli
-torch.manual_seed(0)
-random.seed(0)
-np.random.seed(0)
-
-
 bert_default_config = {
     "lr": 2e-5,
     "num_epochs": 2,
@@ -42,6 +36,7 @@ bert_default_config = {
     "test_dataset": None,
     "stride": 128,
     "max_length": 384,
+    "seed": 0,
 }
 
 
@@ -66,6 +61,14 @@ class OrthoBert:
         self.checkpoint_savedir = kwargs["checkpoint_savedir"]
         self.max_length = kwargs["max_length"]
         self.stride = kwargs["stride"]
+        self.seed = kwargs["seed"]
+
+        # note :: set seed from cli
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        self.g = torch.Generator()
+        self.g.manual_seed(self.seed)
 
         # defined locally
         self.tokenizer = None
@@ -75,6 +78,11 @@ class OrthoBert:
         self.train_dataloader = None
         self.test_dataloader = None
         self.metric = load_metric("squad")
+
+    def __seed_worker(worker_id):
+        worker_seed = torch.initial_seed % 2 ** 32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
 
     def __model_initialization(self, mode):
         """
@@ -268,6 +276,9 @@ class OrthoBert:
                 shuffle=True,
                 collate_fn=default_data_collator,
                 batch_size=8,
+                num_workers=0,
+                worker_init_fn=self.__seed_worker(),
+                generator=self.g,
             )
 
             self.logger.info("training dataset processed and dataloaders created")
@@ -287,6 +298,9 @@ class OrthoBert:
                 test_tensor,
                 collate_fn=default_data_collator,
                 batch_size=1,
+                num_workers=0,
+                worker_init_fn=self.__seed_worker(),
+                generator=self.g,
             )
 
             self.logger.info("validation dataset processed and dataloaders created")
