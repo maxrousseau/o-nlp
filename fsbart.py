@@ -198,6 +198,7 @@ class FsBART:
         # that is not part of the answer, also - some samples may not contain
         # Context in the sequence... then go for the dot?
 
+        answer_tokens = [""]
         if " Answer" in top_tokens:
             start_idx = (
                 top_tokens.index(" Answer") + 2
@@ -243,7 +244,7 @@ class FsBART:
         # BUG -- exact match metric doesn't seem to be working, I don't think
         # it can bc this is a generative model!
 
-        return m
+        return m, predicted_answers, theoretical_answers
 
     def __preprocess(self, examples, type=None):
         # stuff
@@ -355,7 +356,7 @@ class FsBART:
                         (idx, accelerator.gather(outputs.logits).cpu().numpy())
                     )
 
-            score = self.__eval(eval_outputs, self.test_dataset)
+            score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
             print(
                 "Epoch: {}, Loss: {}, Validation F1: {}".format(
@@ -375,5 +376,29 @@ class FsBART:
         # HERE - TODO
         # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
-        # def run(self, ):
-        # """run model for inference only"""
+    def run(self, mode, init=True, evaluate=True):
+        """run model for inference only"""
+        if init:
+            self.__model_initialization(mode)
+            self.__preprocess(self.test_dataset, "validation")
+
+        # BUG :: this is much slower without accelerate for some reason, ITS RUNNING ON THE CPU, Ok fixed if cuda send dataloader and model to GPU
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(device)
+
+        self.model.eval()
+        eval_outputs = []
+        for i, batch in enumerate(self.test_dataloader):
+            with torch.no_grad():
+                batch.pop("offset_mapping")
+                idx = int(batch["example_id"].cpu().numpy())
+                batch.pop("example_id")
+                batch = {k: v.to(device) for k, v in batch.items()}
+
+                outputs = self.model(**batch)
+                eval_outputs.append((idx, outputs.logits.cpu().numpy()))
+
+        metrics, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
+        f1_score = metrics["f1"]
+
+        return f1_score, predictions, targets

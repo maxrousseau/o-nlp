@@ -63,7 +63,7 @@ class OrthoBert:
         self.stride = kwargs["stride"]
         self.seed = kwargs["seed"]
 
-        # note :: set seed from cli
+        # set all seed
         torch.manual_seed(self.seed)
         random.seed(self.seed)
         np.random.seed(self.seed)
@@ -260,9 +260,13 @@ class OrthoBert:
         theoretical_answers = [
             {"id": ex["id"], "answers": ex["answers"]} for ex in examples
         ]
-        return self.metric.compute(
+
+        # @TODO :: add option for metric only or verbose output (predicted, theoretical, and input)
+        metrics = self.metric.compute(
             predictions=predicted_answers, references=theoretical_answers
         )
+
+        return metrics, predicted_answers, theoretical_answer
 
     def preprocess(self, examples, type=None):
         """specify type of preprocessing (train or eval)"""
@@ -381,7 +385,8 @@ class OrthoBert:
 
                 # hf bert models use classes format outputs
                 # https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py#:~:text=return%20QuestionAnsweringModelOutput(,)
-            # ? what is the point of this code...
+
+            # ? what is the point of this code... convert to format for postprocessing function
             start_logits = np.concatenate(start_logits)
             end_logits = np.concatenate(end_logits)
             start_logits = start_logits[: len(self.proc_test_dataset)]
@@ -424,4 +429,39 @@ class OrthoBert:
 
     # def evaluate():
 
-    # def run():
+    def run(self, mode, init=True, evalutate=True):
+        """if eval is true then simply return the F1 score otherwise return the predicted output vs"""
+        # load the model
+        #  TODO :: make reinitialization optional, however then the initialization and preprocessing should be
+        # contained in a separate function .setup() so that the user can either finetune() or run()
+
+        if init:
+            self.__model_initialization(mode)
+            # preprocessing only validation
+            self.preprocess(self.test_dataset, "validation")
+
+        self.model.eval()
+        start_logits = []
+        end_logits = []
+
+        # BUG :: this is much slower without accelerate for some reason, ITS RUNNING ON THE CPU, Ok fixed if cuda send dataloader and model to GPU
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(device)
+
+        for batch in tqdm(self.test_dataloader):
+            batch = {k: v.to(device) for k, v in batch.items()}
+
+            with torch.no_grad():
+                outputs = self.model(**batch)
+                start_logits.append(outputs.start_logits.cpu().numpy())
+                end_logits.append(outputs.end_logits.cpu().numpy())
+
+        start_logits = np.concatenate(start_logits)
+        end_logits = np.concatenate(end_logits)
+        start_logits = start_logits[: len(self.proc_test_dataset)]
+        end_logits = end_logits[: len(self.proc_test_dataset)]
+        metrics, predictions, targets = self.__answerFromLogit(
+            start_logits, end_logits, self.proc_test_dataset, self.test_dataset
+        )
+        f1_score = metrics["f1"]
+        return f1_score, predictions, target
