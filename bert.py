@@ -67,6 +67,11 @@ class OrthoBert:
         torch.manual_seed(self.seed)
         random.seed(self.seed)
         np.random.seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
+        torch.cuda.manual_seed(self.seed)
+
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
         self.g = torch.Generator()
         self.g.manual_seed(self.seed)
 
