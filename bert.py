@@ -464,4 +464,4 @@ class OrthoBert:
             start_logits, end_logits, self.proc_test_dataset, self.test_dataset
         )
         f1_score = metrics["f1"]
-        return f1_score, predictions, target
+        return f1_score, predictions, targets
