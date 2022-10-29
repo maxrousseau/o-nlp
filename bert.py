@@ -266,7 +266,7 @@ class OrthoBert:
             predictions=predicted_answers, references=theoretical_answers
         )
 
-        return metrics, predicted_answers, theoretical_answer
+        return metrics, predicted_answers, theoretical_answers
 
     def preprocess(self, examples, type=None):
         """specify type of preprocessing (train or eval)"""
