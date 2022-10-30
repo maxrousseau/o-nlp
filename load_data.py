@@ -169,3 +169,13 @@ def loadCorpus(corpus_path):
                 page += 1
 
     return (corpus, corpus_keys)
+
+
+# def getAnswerSentence(context, answer):
+#     slist = sent_tokenize(context)
+#     for s in slist:
+#         if answer in s:
+#             return s
+#         else:
+#             continue
+# #use: answer_sentence = [getAnswerSentence(test_c[i], test_a[i]['text'][0]) for i in range(len(test_c))]
