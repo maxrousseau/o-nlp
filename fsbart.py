@@ -1,3 +1,7 @@
+import os
+import shutil
+import time
+
 import random
 import logging
 
@@ -25,6 +29,7 @@ from transformers import default_data_collator
 ###############################################################################
 
 bart_default_config = {
+    "name": "bart-default",
     "lr": 2e-5,
     "num_epochs": 12,
     "lr_scheduler": True,
@@ -64,6 +69,7 @@ class FsBART:
     def __init__(self, **kwargs):
         """base configuration for the few-shot qa with generative BART model"""
         # model/training/inference configuration
+        self.name = kwargs["name"]
         self.lr = kwargs["lr"]
         self.num_epochs = kwargs["num_epochs"]
         self.checkpoint = kwargs["checkpoint"]
@@ -301,6 +307,8 @@ class FsBART:
             )
 
     def finetune(self):
+        local_path = os.path.abspath("./{}-{}".format(self.name, int(time.time())))
+
         self.__model_initialization("qa")
 
         self.__preprocess(self.train_dataset, "training")
@@ -367,20 +375,33 @@ class FsBART:
             # save the best model
             if f1_score > best_f1:
                 best_f1 = f1_score
-                self.model.save_pretrained("./top_bart.bin")
+                if os.path.isfile(local_path):
+                    shutil.rmtree(local_path)
+                self.model.save_pretrained(local_path)
                 self.logger.info("new best model saved!")
 
+        self.model = BartForConditionalGeneration.from_pretrained(
+            local_path, local_files_only=True
+        )
+        self.logger.info("best model reloaded!")
         # final eval
         print("Best model f1 = {}".format(best_f1))
         return best_f1
         # HERE - TODO
         # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
-    def run(self, mode, init=True, evaluate=True):
+    def run(self, mode, init=False, evaluate=True):
         """run model for inference only"""
-        if init:
-            self.__model_initialization(mode)
-            self.__preprocess(self.test_dataset, "validation")
+        try:
+            if init:
+                self.__model_initialization(mode)
+                # preprocessing only validation
+                self.preprocess(self.test_dataset, "validation")
+                self.logger.info("new model initialized")
+            else:
+                self.logger.info("using current model")
+        except:
+            self.logger.error("model initialization error")
 
         # BUG :: this is much slower without accelerate for some reason, ITS RUNNING ON THE CPU, Ok fixed if cuda send dataloader and model to GPU
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
