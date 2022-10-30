@@ -414,7 +414,9 @@ class OrthoBert:
 
         print("Best model f1 = {}".format(best_f1))
 
-        self.model.from_pretrained(local_path, local_files_only=True)
+        self.model = AutoModelForQuestionAnswering.from_pretrained(
+            local_path, local_files_only=True
+        )
         self.logger.info("best model reloaded!")
 
         return best_f1
