@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 
 import logging
@@ -325,7 +326,7 @@ class OrthoBert:
             )
 
     def finetune(self, mode):
-        local_path = os.path.abspath("./{}-{}.bin".format(self.name, int(time.time())))
+        local_path = os.path.abspath("./{}-{}".format(self.name, int(time.time())))
 
         # load the model
         self.__model_initialization(mode)
@@ -409,6 +410,8 @@ class OrthoBert:
             # @TODO -- model checkpoint saving needs to be refined!!!
             if f1_score > best_f1:
                 best_f1 = f1_score
+                if os.path.isfile(local_path):
+                    shutil.rmtree(local_path)
                 self.model.save_pretrained(local_path)
                 self.logger.info("new best model saved!")
 
