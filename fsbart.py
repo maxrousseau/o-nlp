@@ -1,15 +1,18 @@
 import os
 import shutil
 import time
-
 import random
 import logging
 
 import numpy as np
 
-from transformers import DataCollatorForSeq2Seq
-from transformers import AutoTokenizer, BartForConditionalGeneration
-from transformers import get_scheduler
+from transformers import (
+    get_scheduler,
+    DataCollatorForSeq2Seq,
+    BartTokenizer,
+    BartForConditionalGeneration,
+)
+from transformers.adapters import PrefixTuningConfig
 
 from accelerate import Accelerator
 
@@ -20,13 +23,10 @@ import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering
-from transformers import default_data_collator
-
-
 ###############################################################################
 #                          FewShotBART Implementation                         #
 ###############################################################################
+
 
 bart_default_config = {
     "name": "bart-default",
@@ -44,6 +44,9 @@ bart_default_config = {
     "stride": 128,
     "padding": "max_length",
     "seed": 0,
+    "prefix": False,
+    "train_prefix": False,
+    "freeze": False,
 }
 
 
@@ -83,6 +86,9 @@ class FsBART:
         self.padding = kwargs["padding"]
         self.stride = kwargs["stride"]
         self.seed = kwargs["seed"]
+        self.prefix = kwargs["prefix"]
+        self.train_prefix = kwargs["train_prefix"]
+        self.freeze = kwargs["freeze"]
 
         # set all seed
         torch.manual_seed(self.seed)
@@ -105,16 +111,30 @@ class FsBART:
         self.test_dataloader = None
         self.metric = load_metric("squad")
 
-    def __seed_worker(worker_id):
-        worker_seed = torch.initial_seed() % 2 ** 32
+    def __seed_worker(self, worker_id):
+        worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
     def __model_initialization(self, mode):
-        if mode == "qa":
-            self.tokenizer = AutoTokenizer.from_pretrained(self.checkpoint)
+        if mode == "mi":
+            self.tokenizer = BartTokenizer.from_pretrained(self.checkpoint)
             self.model = BartForConditionalGeneration.from_pretrained(self.checkpoint)
-            self.logger.info("tokenizer and QA model initialized")
+            self.logger.info("tokenizer initialized")
+
+            # TODO :: implement the prefix version with transformers-adapers and training code for SQuAD MI
+            if self.prefix:
+                prefix_config = PrefixTuningConfig(flat=False, prefix_length=10)
+                self.model = BartForConditionalGeneration.from_pretrained(
+                    self.checkpoint
+                )
+                self.model.add_adapter("prefix_tuning", config=prefix_config)
+                self.logger.info("prefix bart for mask infilling model initialized")
+            else:
+                self.model = BartForConditionalGeneration.from_pretrained(
+                    self.checkpoint
+                )
+                self.logger.info("tokenizer and QA model initialized")
 
     def __training_preprocessing(self, examples):
         """examples have all three types of string"""
@@ -228,7 +248,6 @@ class FsBART:
 
         theoretical_answers = []
         predicted_answers = []
-        model_outputs = []
         datasets.disable_progress_bar()
 
         for idx, outputs in eval_outputs:
@@ -248,7 +267,7 @@ class FsBART:
         )
 
         # BUG -- exact match metric doesn't seem to be working, I don't think
-        # it can bc this is a generative model!
+        # it can bc this is a generative model?
 
         return m, predicted_answers, theoretical_answers
 
@@ -306,19 +325,41 @@ class FsBART:
                 "preprocessing requires valide type training or validation"
             )
 
-    def finetune(self):
+    # def __post_processing():
+    #     ''' TODO :: need this to append the question ID to the evaluation batch... see HF tutorial to implement'''
+
+    def finetune(self, mode=None, gpu=True):
         local_path = os.path.abspath("./{}-{}".format(self.name, int(time.time())))
 
-        self.__model_initialization("qa")
+        self.__model_initialization("mi")
 
-        self.__preprocess(self.train_dataset, "training")
-        self.__preprocess(self.test_dataset, "validation")
+        if mode == "dev":
+            training_set = self.train_dev_dataset
+            eval_set = self.val_dev_dataset
+        elif mode == "run":
+            training_set = self.train_dataset
+            eval_set = self.test_dataset
+        else:
+            raise NameError('Please specify mode for fine-tuning: "dev" or "run"')
+
+        self.__preprocess(training_set, "training")
+        self.__preprocess(eval_set, "validation")
 
         best_f1 = 0
-
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+        lr_scheduler = get_scheduler(
+            "linear",
+            optimizer=optimizer,
+            num_warmup_steps=0,
+            num_training_steps=num_training_steps,
+        )
 
-        # setup for GPU
+        # TODO prefix and freezing settings
+
+        # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
+        # if gpu:
         accelerator = Accelerator(fp16=True)
         (
             self.model,
@@ -327,16 +368,6 @@ class FsBART:
             self.test_dataloader,
         ) = accelerator.prepare(
             self.model, optimizer, self.train_dataloader, self.test_dataloader
-        )
-
-        num_update_steps_per_epoch = len(self.train_dataloader)
-        num_training_steps = self.num_epochs * num_update_steps_per_epoch
-
-        lr_scheduler = get_scheduler(
-            "linear",
-            optimizer=optimizer,
-            num_warmup_steps=0,
-            num_training_steps=num_training_steps,
         )
 
         for epoch in range(self.num_epochs):
@@ -390,23 +421,24 @@ class FsBART:
         # HERE - TODO
         # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
-    def run(self, mode, init=False, evaluate=True):
+    def run(self, mode, inputs=None, init=False, evaluate=True):
         """run model for inference only"""
         try:
             if init:
                 self.__model_initialization(mode)
                 # preprocessing only validation
-                self.preprocess(self.test_dataset, "validation")
+                self.__preprocess(self.test_dataset, "validation")
                 self.logger.info("new model initialized")
             else:
                 self.logger.info("using current model")
         except:
             self.logger.error("model initialization error")
 
-        # BUG :: this is much slower without accelerate for some reason, ITS RUNNING ON THE CPU, Ok fixed if cuda send dataloader and model to GPU
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
 
+        # TODO if eval true then simply run on validation? otherwise use new samples from input
+        # if eval:
         self.model.eval()
         eval_outputs = []
         for i, batch in enumerate(self.test_dataloader):

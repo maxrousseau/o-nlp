@@ -119,7 +119,7 @@ def formatToMI(dataset):
     qa_strings = []
     answer_strings = []
 
-    for i in range(len(dataset)):
+    for i in range(len(dataset["question"])):
         question = dataset["question"][i]
         answer = dataset["answers"][i]["text"][0]
         context = dataset["context"][i]
@@ -171,11 +171,14 @@ def loadCorpus(corpus_path):
     return (corpus, corpus_keys)
 
 
-# def getAnswerSentence(context, answer):
-#     slist = sent_tokenize(context)
-#     for s in slist:
-#         if answer in s:
-#             return s
-#         else:
-#             continue
-# #use: answer_sentence = [getAnswerSentence(test_c[i], test_a[i]['text'][0]) for i in range(len(test_c))]
+def loadSquadMI(n=None):
+    """create a dataloader for SQuAD"""
+    from datasets import load_dataset
+
+    raw_datasets = load_dataset("squad")
+
+    if n is not None:
+        squad_subset = formatToMI(raw_datasets["train"][:n])
+        return squad_subset
+    else:
+        return 0
