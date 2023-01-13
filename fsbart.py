@@ -6,10 +6,12 @@ import logging
 
 import numpy as np
 
+from tqdm.auto import tqdm
+
 from transformers import (
     get_scheduler,
     DataCollatorForSeq2Seq,
-    BartTokenizer,
+    BartTokenizerFast,
     BartForConditionalGeneration,
 )
 from transformers.adapters import PrefixTuningConfig
@@ -46,7 +48,7 @@ bart_default_config = {
     "seed": 0,
     "prefix": False,
     "train_prefix": False,
-    "freeze": False,
+    "unfreeze": False,
 }
 
 
@@ -88,7 +90,7 @@ class FsBART:
         self.seed = kwargs["seed"]
         self.prefix = kwargs["prefix"]
         self.train_prefix = kwargs["train_prefix"]
-        self.freeze = kwargs["freeze"]
+        self.unfreeze = kwargs["unfreeze"]
 
         # set all seed
         torch.manual_seed(self.seed)
@@ -118,7 +120,7 @@ class FsBART:
 
     def __model_initialization(self, mode):
         if mode == "mi":
-            self.tokenizer = BartTokenizer.from_pretrained(self.checkpoint)
+            self.tokenizer = BartTokenizerFast.from_pretrained(self.checkpoint)
             self.model = BartForConditionalGeneration.from_pretrained(self.checkpoint)
             self.logger.info("tokenizer initialized")
 
@@ -136,17 +138,25 @@ class FsBART:
                 )
                 self.logger.info("tokenizer and QA model initialized")
 
+        if self.train_prefix:
+            self.model.set_active_adapters("prefix_tuning")
+            self.logger.info("training prefix parameters")
+
+        if self.unfreeze:
+            self.model.freeze_model(False)
+            self.logger.info("model parameters unfrozen")
+
     def __training_preprocessing(self, examples):
         """examples have all three types of string"""
 
         model_inputs = self.tokenizer(
-            examples["masked_strings"],
+            text=examples["masked_strings"],
             max_length=self.max_seq_length,
             padding=self.padding,
             truncation=False,
         )
         labels = self.tokenizer(
-            text_target=examples["qa_strings"],
+            text=examples["qa_strings"],
             max_length=self.max_ans_length,
             padding=self.padding,
             truncation=True,
@@ -167,7 +177,7 @@ class FsBART:
     def __evaluation_preprocessing(self, examples):
         """ """
         model_inputs = self.tokenizer(
-            examples["masked_strings"],
+            text=examples["masked_strings"],
             max_length=self.max_seq_length,
             padding=self.padding,
             truncation=False,
@@ -182,7 +192,7 @@ class FsBART:
         # NOTE :: temporarily set to false to try out the model
 
         labels = self.tokenizer(
-            text_target=examples["qa_strings"],
+            text=examples["qa_strings"],
             max_length=self.max_ans_length,
             padding=self.padding,
             truncation=True,
@@ -260,7 +270,7 @@ class FsBART:
                 {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
             )
             predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
-            # print("PRED {} ANS {}".format(predicted_answer, label_answer[0]))
+            print("PRED {} ANS {}".format(predicted_answer, label_answer[0]))
 
         m = self.metric.compute(
             predictions=predicted_answers, references=theoretical_answers
@@ -297,7 +307,7 @@ class FsBART:
                 collate_fn=data_collator,
                 batch_size=4,
                 num_workers=0,
-                worker_init_fn=self.__seed_worker(),
+                worker_init_fn=self.__seed_worker,
                 generator=self.g,
             )
             self.logger.info("training dataset processed and dataloaders created")
@@ -308,14 +318,15 @@ class FsBART:
                 batched=True,
                 remove_columns=examples.column_names,
             )
-            test_tensor = self.proc_test_dataset
+            test_tensor = self.proc_test_dataset.remove_columns(["example_id"])
             test_tensor.set_format("torch")
+
             self.test_dataloader = DataLoader(
                 test_tensor,
                 collate_fn=data_collator,
                 batch_size=1,
                 num_workers=0,
-                worker_init_fn=self.__seed_worker(),
+                worker_init_fn=self.__seed_worker,
                 generator=self.g,
             )
             self.logger.info("validation dataset processed and dataloaders created")
@@ -326,7 +337,7 @@ class FsBART:
             )
 
     # def __post_processing():
-    #     ''' TODO :: need this to append the question ID to the evaluation batch... see HF tutorial to implement'''
+    #     ''' TODO :: maybe I need this for bert but not necessarily for bart unless I go beyond the length.... (see later)'''
 
     def finetune(self, mode=None, gpu=True):
         local_path = os.path.abspath("./{}-{}".format(self.name, int(time.time())))
@@ -345,7 +356,7 @@ class FsBART:
         self.__preprocess(training_set, "training")
         self.__preprocess(eval_set, "validation")
 
-        best_f1 = 0
+        best_f1 = -1
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_update_steps_per_epoch = len(self.train_dataloader)
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
@@ -356,44 +367,50 @@ class FsBART:
             num_training_steps=num_training_steps,
         )
 
-        # TODO prefix and freezing settings
-
         # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
-        # if gpu:
-        accelerator = Accelerator(fp16=True)
-        (
-            self.model,
-            optimizer,
-            self.train_dataloader,
-            self.test_dataloader,
-        ) = accelerator.prepare(
-            self.model, optimizer, self.train_dataloader, self.test_dataloader
-        )
 
+        if torch.device != "cpu":
+            accelerator = Accelerator(fp16=True)
+            (
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                self.test_dataloader,
+            ) = accelerator.prepare(
+                self.model, optimizer, self.train_dataloader, self.test_dataloader
+            )
+
+        progressbar = tqdm(range(num_training_steps))
         for epoch in range(self.num_epochs):
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
                 outputs = self.model(**batch)
                 loss = outputs.loss
-                accelerator.backward(loss)
+                if torch.device != "cpu":
+                    accelerator.backward(loss)
+                else:
+                    loss.backward()
 
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+                progressbar.update(1)
 
             eval_outputs = []
             for i, batch in enumerate(self.test_dataloader):
                 self.model.eval()
                 with torch.no_grad():
                     batch.pop("offset_mapping")
-                    idx = int(batch["example_id"].cpu().numpy())
-                    batch.pop("example_id")
+                    idx = self.proc_test_dataset["example_id"][i]
                     outputs = self.model(
                         **batch
                     )  # BUG idk why but evaluation is extremely slow....
-                    eval_outputs.append(
-                        (idx, accelerator.gather(outputs.logits).cpu().numpy())
-                    )
+                    if torch.device != "cpu":
+                        eval_outputs.append(
+                            (idx, accelerator.gather(outputs.logits).cpu().numpy())
+                        )
+                    else:
+                        eval_outputs.append((idx, outputs.logits.cpu().numpy()))
 
             score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
