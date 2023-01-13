@@ -396,7 +396,7 @@ class FsBART:
                 progressbar.update(1)
 
             eval_outputs = []
-            for i, batch in enumerate(self.test_dataloader):
+            for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
                     batch.pop("offset_mapping")
