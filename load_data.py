@@ -104,6 +104,7 @@ def load_mini_oqa(train_path, test_path):
     return (dev_train_set, val_set, full_train_set, test_set)
 
 
+# @TODO :: rewrite in cython? this is too slow...
 def formatToMI(dataset):
     """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
     "Question: a question? Answer: <mask>. Context: this is the context"

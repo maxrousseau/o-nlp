@@ -270,7 +270,6 @@ class FsBART:
                 {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
             )
             predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
-            print("PRED {} ANS {}".format(predicted_answer, label_answer[0]))
 
         m = self.metric.compute(
             predictions=predicted_answers, references=theoretical_answers
