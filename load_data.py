@@ -171,14 +171,15 @@ def loadCorpus(corpus_path):
     return (corpus, corpus_keys)
 
 
-def loadSquadMI(n=None):
+def loadSquadMI(n=None, set=None):
     """create a dataloader for SQuAD"""
     from datasets import load_dataset
 
     raw_datasets = load_dataset("squad")
 
     if n is not None:
-        squad_subset = formatToMI(raw_datasets["train"][:n])
+        squad_subset = formatToMI(raw_datasets[set][:n])
         return squad_subset
     else:
-        return 0
+        squad_subset = formatToMI(raw_datasets[set])
+        return squad_subset
