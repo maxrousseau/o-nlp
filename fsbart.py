@@ -395,6 +395,7 @@ class FsBART:
                 optimizer.zero_grad()
                 progressbar.update(1)
 
+            self.logger.info("Epoch done, backprop done")  # debug
             eval_outputs = []
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
@@ -411,6 +412,7 @@ class FsBART:
                     else:
                         eval_outputs.append((idx, outputs.logits.cpu().numpy()))
 
+            self.logger.info("PRE-eval")  # debug
             score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
             print(
