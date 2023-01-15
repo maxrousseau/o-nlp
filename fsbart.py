@@ -180,7 +180,7 @@ class FsBART:
             text=examples["masked_strings"],
             max_length=self.max_seq_length,
             padding=self.padding,
-            truncation=False,
+            truncation=True,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
         )
@@ -304,7 +304,7 @@ class FsBART:
                 train_tensor,
                 shuffle=True,
                 collate_fn=data_collator,
-                batch_size=8,
+                batch_size=16,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -323,7 +323,7 @@ class FsBART:
             self.test_dataloader = DataLoader(
                 test_tensor,
                 collate_fn=data_collator,
-                batch_size=8,
+                batch_size=16,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -405,7 +405,9 @@ class FsBART:
                         **batch
                     )  # BUG idk why but evaluation is extremely slow....
                     if torch.device != "cpu":
-                        answers.append(accelerator.gather(outputs.logits).cpu().numpy())
+                        answers.append(
+                            accelerator.gather(outputs.logits).detach().cpu().numpy()
+                        )
                     else:
                         answers.append(outputs.logits.cpu().numpy())
 
