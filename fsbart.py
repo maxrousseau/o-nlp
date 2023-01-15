@@ -304,7 +304,7 @@ class FsBART:
                 train_tensor,
                 shuffle=True,
                 collate_fn=data_collator,
-                batch_size=4,
+                batch_size=8,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -323,7 +323,7 @@ class FsBART:
             self.test_dataloader = DataLoader(
                 test_tensor,
                 collate_fn=data_collator,
-                batch_size=1,
+                batch_size=8,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -396,22 +396,20 @@ class FsBART:
                 progressbar.update(1)
 
             self.logger.info("Epoch done, backprop done")  # debug
-            eval_outputs = []
+            answers = []
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
                     batch.pop("offset_mapping")
-                    idx = self.proc_test_dataset["example_id"][i]
                     outputs = self.model(
                         **batch
                     )  # BUG idk why but evaluation is extremely slow....
                     if torch.device != "cpu":
-                        eval_outputs.append(
-                            (idx, accelerator.gather(outputs.logits).cpu().numpy())
-                        )
+                        answers.append(accelerator.gather(outputs.logits).cpu().numpy())
                     else:
-                        eval_outputs.append((idx, outputs.logits.cpu().numpy()))
+                        answers.append(outputs.logits.cpu().numpy())
 
+            eval_outputs = list(zip(self.proc_test_dataset["example_id"], answers))
             self.logger.info("PRE-eval")  # debug
             score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
