@@ -1,4 +1,5 @@
 import os
+
 import shutil
 import time
 import random
@@ -142,9 +143,10 @@ class FsBART:
             self.model.set_active_adapters("prefix_tuning")
             self.logger.info("training prefix parameters")
 
-        if self.unfreeze:
-            self.model.freeze_model(False)
-            self.logger.info("model parameters unfrozen")
+        # TODO see how to incorporate unfreezing of model params and various combinations of adapters vs full model (frozen/unfrozen)
+        # if self.unfreeze:
+        #     self.model.freeze_model(False)
+        #     self.logger.info("model parameters unfrozen")
 
     def __training_preprocessing(self, examples):
         """examples have all three types of string"""
@@ -224,7 +226,7 @@ class FsBART:
 
     def __clean_output(self, output):
         """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
-        seq = output[0]
+        seq = output
         top_tokens = []
         for i in seq:
             top_tokens.append(
@@ -260,15 +262,15 @@ class FsBART:
         predicted_answers = []
         datasets.disable_progress_bar()
 
-        for idx, outputs in eval_outputs:
+        for idx, predicted_answer in eval_outputs:
             label_answer = answers.filter(lambda sample: sample["id"] == idx)[
                 "answer_strings"
             ]
-            predicted_answer = self.__clean_output(outputs)
 
             theoretical_answers.append(
                 {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
             )
+
             predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
 
         m = self.metric.compute(
@@ -304,7 +306,7 @@ class FsBART:
                 train_tensor,
                 shuffle=True,
                 collate_fn=data_collator,
-                batch_size=16,
+                batch_size=8,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -323,7 +325,7 @@ class FsBART:
             self.test_dataloader = DataLoader(
                 test_tensor,
                 collate_fn=data_collator,
-                batch_size=16,
+                batch_size=8,
                 num_workers=0,
                 worker_init_fn=self.__seed_worker,
                 generator=self.g,
@@ -395,8 +397,8 @@ class FsBART:
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-            self.logger.info("Epoch done, backprop done")  # debug
-            answers = []
+            predicted_answers = []
+            answer_batch = None
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
@@ -405,14 +407,34 @@ class FsBART:
                         **batch
                     )  # BUG idk why but evaluation is extremely slow....
                     if torch.device != "cpu":
-                        answers.append(
-                            accelerator.gather(outputs.logits).detach().cpu().numpy()
-                        )
-                    else:
-                        answers.append(outputs.logits.cpu().numpy())
+                        if i == 0:
+                            answer_batch = (
+                                accelerator.gather(outputs.logits).cpu().numpy()
+                            )
+                        elif (i % 512 == 0) & (i != 0):
+                            predicted_answers += [
+                                self.__clean_output(i) for i in answer_batch
+                            ]
+                            answer_batch = (
+                                accelerator.gather(outputs.logits).cpu().numpy()
+                            )
+                        else:
+                            answer_batch = np.concatenate(
+                                (
+                                    answer_batch,
+                                    accelerator.gather(outputs.logits).cpu().numpy(),
+                                ),
+                                axis=0,
+                            )
 
-            eval_outputs = list(zip(self.proc_test_dataset["example_id"], answers))
-            self.logger.info("PRE-eval")  # debug
+                    # else:
+                    # answers.append(outputs.logits.cpu().numpy())
+
+            predicted_answers += [self.__clean_output(i) for i in answer_batch]
+
+            eval_outputs = list(
+                zip(self.proc_test_dataset["example_id"], predicted_answers)
+            )
             score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
             print(

@@ -1,5 +1,9 @@
 import json
+import gc
+
 from datasets import Dataset
+from datasets import load_dataset
+import pyarrow as pa
 
 
 def load_bioasq(train_path, test_path):
@@ -104,7 +108,6 @@ def load_mini_oqa(train_path, test_path):
     return (dev_train_set, val_set, full_train_set, test_set)
 
 
-# @TODO :: rewrite in cython? this is too slow...
 def formatToMI(dataset):
     """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
     "Question: a question? Answer: <mask>. Context: this is the context"
@@ -115,30 +118,28 @@ def formatToMI(dataset):
 
         # then you can feed those to the FsBART model class at initialization to run
     """
-    masked_strings = []
-    full_strings = []
-    qa_strings = []
-    answer_strings = []
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    questions = pa.array(dataset["question"])
+    answers = pa.array([i["text"][0] for i in dataset["answers"]])
 
-    for i in range(len(dataset["question"])):
-        question = dataset["question"][i]
-        answer = dataset["answers"][i]["text"][0]
-        context = dataset["context"][i]
+    masked_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: <mask>. Context: ", contexts, ""
+    )
+    full_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ". Context: ", contexts, ""
+    )
+    qa_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ".", contexts, ""
+    )
 
-        masked_strings.append(
-            "Question: {} Answer: <mask>. Context: {}".format(question, context)
-        )
-        full_strings.append(
-            "Question: {} Answer: {}. Context: {}".format(question, answer, context)
-        )
-        qa_strings.append("Question: {} Answer: {}.".format(question, answer))
-        answer_strings.append(answer)
+    gc.enable()
 
     return {
-        "masked_strings": masked_strings,
-        "full_strings": full_strings,
-        "qa_strings": qa_strings,
-        "answer_strings": answer_strings,
+        "masked_strings": masked_strings.to_pylist(),
+        "full_strings": full_strings.to_pylist(),
+        "qa_strings": qa_strings.to_pylist(),
+        "answer_strings": answers.to_pylist(),
         "id": dataset["id"],
     }
 
@@ -174,7 +175,6 @@ def loadCorpus(corpus_path):
 
 def loadSquadMI(n=None, set=None):
     """create a dataloader for SQuAD"""
-    from datasets import load_dataset
 
     raw_datasets = load_dataset("squad")
 
