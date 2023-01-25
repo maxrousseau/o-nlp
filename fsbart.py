@@ -347,8 +347,10 @@ class FsBART:
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
-                    outputs = self.model(
-                        **batch
+                    outputs = self.model.generate(
+                        **batch["input_ids"],
+                        max_length=100,
+                        num_beams=1,
                     )  # BUG idk why but evaluation is extremely slow....
                     if torch.device != "cpu":
                         if i == 0:
