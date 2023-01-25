@@ -167,6 +167,8 @@ class FsBART:
             truncation=True,
         )
 
+        batch = {k: v for k, v in source_tokenized.items()}
+
         if return_targets:
 
             target_tokenized = self.tokenizer(
@@ -181,8 +183,6 @@ class FsBART:
                 [-100 if token == self.tokenizer.pad_token_id else token for token in l]
                 for l in target_tokenized["input_ids"]
             ]
-
-        batch = {k: v for k, v in source_tokenized.items()}
 
         batch["example_id"] = examples["id"]
 
