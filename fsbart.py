@@ -114,12 +114,12 @@ class FsBART:
         self.test_dataloader = None
         self.metric = load_metric("squad")
 
-    def __seed_worker(self, worker_id):
+    def seed_worker(self, worker_id):
         worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
-    def __model_initialization(self, mode):
+    def model_initialization(self, mode):
         if mode == "mi":
             self.tokenizer = BartTokenizerFast.from_pretrained(self.checkpoint)
             self.model = BartForConditionalGeneration.from_pretrained(self.checkpoint)
@@ -137,7 +137,7 @@ class FsBART:
                 self.model = BartForConditionalGeneration.from_pretrained(
                     self.checkpoint
                 )
-                self.logger.info("tokenizer and QA model initialized")
+                self.logger.info("bart model initialized")
 
         if self.train_prefix:
             self.model.set_active_adapters("prefix_tuning")
@@ -148,83 +148,34 @@ class FsBART:
         #     self.model.freeze_model(False)
         #     self.logger.info("model parameters unfrozen")
 
-    def __training_preprocessing(self, examples):
-        """examples have all three types of string"""
-
-        model_inputs = self.tokenizer(
-            text=examples["masked_strings"],
+    def preprocess(self, examples):
+        source, target = examples["masked_strings"], examples["qa_strings"]
+        source_tokenized = self.tokenizer(
+            source,
+            padding=self.padding,
             max_length=self.max_seq_length,
-            padding=self.padding,
-            truncation=False,
-        )
-        labels = self.tokenizer(
-            text=examples["qa_strings"],
-            max_length=self.max_ans_length,
-            padding=self.padding,
             truncation=True,
         )
 
-        # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
-        # padding in the loss.
-        if self.padding == "max_length":
-            labels["input_ids"] = [
-                [(l if l != self.tokenizer.pad_token_id else -100) for l in label]
-                for label in labels["input_ids"]
-            ]
-
-        model_inputs["labels"] = labels["input_ids"]
-
-        return model_inputs
-
-    def __evaluation_preprocessing(self, examples):
-        """ """
-        model_inputs = self.tokenizer(
-            text=examples["masked_strings"],
+        target_tokenized = self.tokenizer(
+            target,
+            padding=self.padding,
             max_length=self.max_seq_length,
-            padding=self.padding,
-            truncation=True,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-        )
-        # BUG :: truncation of the input will offset the answer and create a
-        # tensor of inequal length were we would have a greater number of spans
-        # for a given number of labels, should I include a dummy label - that
-        # would not work?, i think the bug comes from returning the overflowing
-        # tokens....
-        # NOTE :: temporarily set to false to try out the model
-
-        labels = self.tokenizer(
-            text=examples["qa_strings"],
-            max_length=self.max_ans_length,
-            padding=self.padding,
             truncation=True,
         )
 
-        # Since one example might give us several features if it has a long context, we need a map from a feature to
-        # its corresponding example. This key gives us just that.
-        sample_mapping = model_inputs.pop("overflow_to_sample_mapping")
+        batch = {k: v for k, v in source_tokenized.items()}
 
-        # For evaluation, we will need to convert our predictions to substrings of the context, so we keep the
-        # corresponding example_id and we will store the offset mappings.
-        model_inputs["example_id"] = []
+        batch["example_id"] = examples["id"]
 
-        for i in range(len(model_inputs["input_ids"])):
-            # One example can give several spans, this is the index of the example containing this span of text.
-            sample_index = sample_mapping[i]
-            model_inputs["example_id"].append(examples["id"][sample_index])
+        # Ignore padding in the loss
+        batch["labels"] = [
+            [-100 if token == self.tokenizer.pad_token_id else token for token in l]
+            for l in target_tokenized["input_ids"]
+        ]
+        return batch
 
-        # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
-        # padding in the loss.
-        if self.padding == "max_length":
-            labels["input_ids"] = [
-                [(l if l != self.tokenizer.pad_token_id else -100) for l in label]
-                for label in labels["input_ids"]
-            ]
-        model_inputs["labels"] = labels["input_ids"]
-
-        return model_inputs
-
-    def __clean_output(self, output):
+    def clean_output(self, output):
         """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
         seq = output
         top_tokens = []
@@ -256,7 +207,7 @@ class FsBART:
         answer_str = "".join(answer_tokens).strip()
         return answer_str
 
-    def __eval(self, eval_outputs, answers):
+    def eval(self, eval_outputs, answers):
 
         theoretical_answers = []
         predicted_answers = []
@@ -282,7 +233,7 @@ class FsBART:
 
         return m, predicted_answers, theoretical_answers
 
-    def __preprocess(self, examples, type=None):
+    def prepare(self, examples, shuffle, type=None):
         # stuff
 
         label_pad_token_id = -100
@@ -293,49 +244,27 @@ class FsBART:
             pad_to_multiple_of=8,
         )
 
-        if type == "training":
+        tokenized_dataset = examples.map(
+            self.preprocess,
+            batched=True,
+            remove_columns=examples.column_names,
+        )
 
-            self.proc_train_dataset = examples.map(
-                self.__training_preprocessing,
-                batched=True,
-                remove_columns=examples.column_names,
-            )
-            train_tensor = self.proc_train_dataset
-            train_tensor.set_format("torch")
-            self.train_dataloader = DataLoader(
-                train_tensor,
-                shuffle=True,
-                collate_fn=data_collator,
-                batch_size=8,
-                num_workers=0,
-                worker_init_fn=self.__seed_worker,
-                generator=self.g,
-            )
-            self.logger.info("training dataset processed and dataloaders created")
+        tensor = tokenized_dataset.remove_columns(["example_id"])
+        tensor.set_format("torch")
 
-        elif type == "validation":
-            self.proc_test_dataset = examples.map(
-                self.__evaluation_preprocessing,
-                batched=True,
-                remove_columns=examples.column_names,
-            )
-            test_tensor = self.proc_test_dataset.remove_columns(["example_id"])
-            test_tensor.set_format("torch")
+        dataloader = DataLoader(
+            tensor,
+            shuffle=shuffle,
+            collate_fn=data_collator,
+            batch_size=4,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
 
-            self.test_dataloader = DataLoader(
-                test_tensor,
-                collate_fn=data_collator,
-                batch_size=8,
-                num_workers=0,
-                worker_init_fn=self.__seed_worker,
-                generator=self.g,
-            )
-            self.logger.info("validation dataset processed and dataloaders created")
-
-        else:
-            self.logger.error(
-                "preprocessing requires valide type training or validation"
-            )
+        self.logger.info("{} dataset processed and dataloaders created".format(type))
+        return dataloader, tokenized_dataset
 
     # def __post_processing():
     #     ''' TODO :: maybe I need this for bert but not necessarily for bart unless I go beyond the length.... (see later)'''
@@ -343,7 +272,7 @@ class FsBART:
     def finetune(self, mode=None, gpu=True):
         local_path = os.path.abspath("./{}-{}".format(self.name, int(time.time())))
 
-        self.__model_initialization("mi")
+        self.model_initialization("mi")
 
         if mode == "dev":
             training_set = self.train_dev_dataset
@@ -354,8 +283,12 @@ class FsBART:
         else:
             raise NameError('Please specify mode for fine-tuning: "dev" or "run"')
 
-        self.__preprocess(training_set, "training")
-        self.__preprocess(eval_set, "validation")
+        self.train_dataloader, self.proc_train_dataset = self.prepare(
+            training_set, shuffle=True, type="training"
+        )
+        self.test_dataloader, self.proc_test_dataset = self.prepare(
+            eval_set, shuffle=False, type="validation"
+        )
 
         best_f1 = -1
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
@@ -369,7 +302,6 @@ class FsBART:
         )
 
         # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
-
         if torch.device != "cpu":
             accelerator = Accelerator(fp16=True)
             (
@@ -402,7 +334,6 @@ class FsBART:
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
-                    batch.pop("offset_mapping")
                     outputs = self.model(
                         **batch
                     )  # BUG idk why but evaluation is extremely slow....
@@ -411,9 +342,9 @@ class FsBART:
                             answer_batch = (
                                 accelerator.gather(outputs.logits).cpu().numpy()
                             )
-                        elif (i % 512 == 0) & (i != 0):
+                        elif (i % 4 == 0) & (i != 0):
                             predicted_answers += [
-                                self.__clean_output(i) for i in answer_batch
+                                self.clean_output(i) for i in answer_batch
                             ]
                             answer_batch = (
                                 accelerator.gather(outputs.logits).cpu().numpy()
@@ -427,17 +358,20 @@ class FsBART:
                                 axis=0,
                             )
 
-                    # else:
-                    # answers.append(outputs.logits.cpu().numpy())
+                    else:
+                        # have the same as above for cpu (if needed)
+                        predicted_answers += [
+                            self.clean_output(i) for i in outputs.logits.cpu().numpy()
+                        ]
 
-            predicted_answers += [self.__clean_output(i) for i in answer_batch]
+            predicted_answers += [self.clean_output(i) for i in answer_batch]
 
             eval_outputs = list(
                 zip(self.proc_test_dataset["example_id"], predicted_answers)
             )
-            score, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
+            score, predictions, targets = self.eval(eval_outputs, self.test_dataset)
             f1_score = score["f1"]
-            print(
+            self.logger.info(
                 "Epoch: {}, Loss: {}, Validation F1: {}".format(
                     epoch, float(loss.cpu()), score
                 )
@@ -465,9 +399,9 @@ class FsBART:
         """run model for inference only"""
         try:
             if init:
-                self.__model_initialization(mode)
+                self.model_initialization(mode)
                 # preprocessing only validation
-                self.__preprocess(self.test_dataset, "validation")
+                self.preprocess(self.test_dataset, "validation")
                 self.logger.info("new model initialized")
             else:
                 self.logger.info("using current model")
@@ -491,7 +425,7 @@ class FsBART:
                 outputs = self.model(**batch)
                 eval_outputs.append((idx, outputs.logits.cpu().numpy()))
 
-        metrics, predictions, targets = self.__eval(eval_outputs, self.test_dataset)
+        metrics, predictions, targets = self.eval(eval_outputs, self.test_dataset)
         f1_score = metrics["f1"]
 
         return f1_score, predictions, targets
