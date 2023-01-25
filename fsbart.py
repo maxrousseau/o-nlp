@@ -48,6 +48,7 @@ bart_default_config = {
     "padding": "max_length",
     "seed": 0,
     "prefix": False,
+    "pretrained_prefix": None,
     "train_prefix": False,
     "unfreeze": False,
 }
@@ -90,6 +91,7 @@ class FsBART:
         self.stride = kwargs["stride"]
         self.seed = kwargs["seed"]
         self.prefix = kwargs["prefix"]
+        self.pretrained_prefix = kwargs["pretrained_prefix"]
         self.train_prefix = kwargs["train_prefix"]
         self.unfreeze = kwargs["unfreeze"]
 
@@ -131,7 +133,15 @@ class FsBART:
                 self.model = BartForConditionalGeneration.from_pretrained(
                     self.checkpoint
                 )
-                self.model.add_adapter("prefix_tuning", config=prefix_config)
+                if self.pretrained_prefix != None:
+                    self.model.load_adapter(
+                        self.pretrained_prefix,
+                        config=prefix_config,
+                        load_as="prefix_tuning",
+                    )
+
+                else:
+                    self.model.add_adapter("prefix_tuning", config=prefix_config)
                 self.logger.info("prefix bart for mask infilling model initialized")
             else:
                 self.model = BartForConditionalGeneration.from_pretrained(
@@ -382,13 +392,17 @@ class FsBART:
                 best_f1 = f1_score
                 if os.path.isfile(local_path):
                     shutil.rmtree(local_path)
-                self.model.save_pretrained(local_path)
-                self.logger.info("new best model saved!")
+                if self.train_prefix:
+                    self.model.save_adapter(local_path, "prefix_tuning")
+                    self.logger.info("new best prefix adapter saved!")
+                else:
+                    self.model.save_pretrained(local_path)
+                    self.logger.info("new best model saved!")
 
-        self.model = BartForConditionalGeneration.from_pretrained(
-            local_path, local_files_only=True
-        )
-        self.logger.info("best model reloaded!")
+        # self.model = BartForConditionalGeneration.from_pretrained(
+        #     local_path, local_files_only=True
+        # )
+        # self.logger.info("best model reloaded!")
         # final eval
         print("Best model f1 = {}".format(best_f1))
         return best_f1
