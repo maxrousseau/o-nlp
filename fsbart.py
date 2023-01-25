@@ -158,7 +158,7 @@ class FsBART:
         #     self.model.freeze_model(False)
         #     self.logger.info("model parameters unfrozen")
 
-    def preprocess(self, examples):
+    def preprocess(self, examples, return_targets=True):
         source, target = examples["masked_strings"], examples["qa_strings"]
         source_tokenized = self.tokenizer(
             source,
@@ -167,22 +167,25 @@ class FsBART:
             truncation=True,
         )
 
-        target_tokenized = self.tokenizer(
-            target,
-            padding=self.padding,
-            max_length=self.max_seq_length,
-            truncation=True,
-        )
+        if return_targets:
+
+            target_tokenized = self.tokenizer(
+                target,
+                padding=self.padding,
+                max_length=self.max_seq_length,
+                truncation=True,
+            )
+
+            # Ignore padding in the loss
+            batch["labels"] = [
+                [-100 if token == self.tokenizer.pad_token_id else token for token in l]
+                for l in target_tokenized["input_ids"]
+            ]
 
         batch = {k: v for k, v in source_tokenized.items()}
 
         batch["example_id"] = examples["id"]
 
-        # Ignore padding in the loss
-        batch["labels"] = [
-            [-100 if token == self.tokenizer.pad_token_id else token for token in l]
-            for l in target_tokenized["input_ids"]
-        ]
         return batch
 
     def clean_output(self, output):
@@ -243,7 +246,7 @@ class FsBART:
 
         return m, predicted_answers, theoretical_answers
 
-    def prepare(self, examples, shuffle, type=None):
+    def prepare(self, examples, shuffle, return_targets=True, type=None):
         # stuff
 
         label_pad_token_id = -100
@@ -255,7 +258,7 @@ class FsBART:
         )
 
         tokenized_dataset = examples.map(
-            self.preprocess,
+            self.preprocess(return_targets=return_targets),
             batched=True,
             remove_columns=examples.column_names,
         )
@@ -294,10 +297,10 @@ class FsBART:
             raise NameError('Please specify mode for fine-tuning: "dev" or "run"')
 
         self.train_dataloader, self.proc_train_dataset = self.prepare(
-            training_set, shuffle=True, type="training"
+            training_set, shuffle=True, return_targets=True, type="training"
         )
         self.test_dataloader, self.proc_test_dataset = self.prepare(
-            eval_set, shuffle=False, type="validation"
+            eval_set, shuffle=False, return_targets=False, type="validation"
         )
 
         best_f1 = -1
@@ -399,13 +402,14 @@ class FsBART:
                     self.model.save_pretrained(local_path)
                     self.logger.info("new best model saved!")
 
-        # self.model = BartForConditionalGeneration.from_pretrained(
-        #     local_path, local_files_only=True
-        # )
-        # self.logger.info("best model reloaded!")
-        # final eval
-        print("Best model f1 = {}".format(best_f1))
+        self.model = BartForConditionalGeneration.from_pretrained(
+            local_path, local_files_only=True
+        )
+        self.logger.info("best model reloaded!")
+
+        self.logger.info("Best model f1 = {}".format(best_f1))
         return best_f1
+
         # HERE - TODO
         # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
