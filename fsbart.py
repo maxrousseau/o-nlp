@@ -130,7 +130,7 @@ class FsBART:
 
             # TODO :: implement the prefix version with transformers-adapers and training code for SQuAD MI
             if self.prefix:
-                prefix_config = PrefixTuningConfig(flat=False, prefix_length=10)
+                prefix_config = PrefixTuningConfig(flat=False, prefix_length=128)
                 self.model = BartForConditionalGeneration.from_pretrained(
                     self.checkpoint
                 )
