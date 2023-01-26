@@ -155,9 +155,9 @@ class FsBART:
             self.logger.info("training prefix parameters")
 
         # TODO see how to incorporate unfreezing of model params and various combinations of adapters vs full model (frozen/unfrozen)
-        # if self.unfreeze:
-        #     self.model.freeze_model(False)
-        #     self.logger.info("model parameters unfrozen")
+        if self.unfreeze:
+            self.model.freeze_model(False)
+            self.logger.info("model parameters unfrozen")
 
     def preprocess_val(self, examples):
         source = examples["masked_strings"]
