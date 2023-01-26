@@ -159,7 +159,7 @@ class FsBART:
         #     self.logger.info("model parameters unfrozen")
 
     def preprocess_val(self, examples):
-        source, target = examples["masked_strings"], examples["qa_strings"]
+        source = examples["masked_strings"]
         source_tokenized = self.tokenizer(
             source,
             padding=self.padding,
@@ -201,37 +201,18 @@ class FsBART:
 
         return batch
 
-    def clean_output(self, output):
+    def clean_output(self, output_ids):
         """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
-        seq = output
-        top_tokens = []
-        for i in seq:
-            top_tokens.append(
-                self.tokenizer.decode(np.argmax(i), skip_special_tokens=True)
-            )
-        # NOTE :: when I eval the model I need to actually remove all the stuff
-        # that is not part of the answer, also - some samples may not contain
-        # Context in the sequence... then go for the dot?
+        out = self.tokenizer.decode(output_ids, skip_special_tokens=True)
 
-        answer_tokens = [""]
-        if " Answer" in top_tokens:
-            start_idx = (
-                top_tokens.index(" Answer") + 2
-            )  # skip the ":" token, maybe check if its there before?
-            if " Context" in top_tokens:
-                end_idx = (
-                    top_tokens.index(" Context") - 1
-                )  # skip the "." token, maybe check if its there before...
-            elif "." in top_tokens:
-                end_idx = top_tokens.index(".")
-                answer_tokens = top_tokens[start_idx:end_idx]
-            else:
-                answer_tokens = [""]
-        else:
-            answer_tokens = [""]
+        try:
+            answer_start = out.find("Answer: ") + 8
+            answer_end = out.find("Context")
+            answer = out[answer_start:answer_end]
+        except:
+            answer = ""
 
-        answer_str = "".join(answer_tokens).strip()
-        return answer_str
+        return answer
 
     def eval(self, eval_outputs, answers):
 
@@ -363,44 +344,19 @@ class FsBART:
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-            predicted_answers = []
-            answer_batch = None
+            answer_batch = []
             for i, batch in enumerate(tqdm(self.test_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
                     outputs = self.model.generate(
-                        **batch["input_ids"],
+                        **batch,
                         max_length=100,
                         num_beams=1,
                     )  # BUG idk why but evaluation is extremely slow....
-                    if torch.device != "cpu":
-                        if i == 0:
-                            answer_batch = (
-                                accelerator.gather(outputs.logits).cpu().numpy()
-                            )
-                        elif (i % 4 == 0) & (i != 0):
-                            predicted_answers += [
-                                self.clean_output(i) for i in answer_batch
-                            ]
-                            answer_batch = (
-                                accelerator.gather(outputs.logits).cpu().numpy()
-                            )
-                        else:
-                            answer_batch = np.concatenate(
-                                (
-                                    answer_batch,
-                                    accelerator.gather(outputs.logits).cpu().numpy(),
-                                ),
-                                axis=0,
-                            )
+                    for i in outputs:
+                        answer_batch.append(i)
 
-                    else:
-                        # have the same as above for cpu (if needed)
-                        predicted_answers += [
-                            self.clean_output(i) for i in outputs.logits.cpu().numpy()
-                        ]
-
-            predicted_answers += [self.clean_output(i) for i in answer_batch]
+            predicted_answers = [self.clean_output(i) for i in answer_batch]
 
             eval_outputs = list(
                 zip(self.proc_test_dataset["example_id"], predicted_answers)
