@@ -384,10 +384,10 @@ class FsBART:
                     self.model.save_pretrained(local_path)
                     self.logger.info("new best model saved!")
 
-        self.model = BartForConditionalGeneration.from_pretrained(
-            local_path, local_files_only=True
-        )
-        self.logger.info("best model reloaded!")
+        # self.model = BartForConditionalGeneration.from_pretrained(
+        #     local_path, local_files_only=True
+        # )
+        # self.logger.info("best model reloaded!")
 
         self.logger.info("Best model f1 = {}".format(best_f1))
         return best_f1
