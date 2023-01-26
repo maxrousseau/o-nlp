@@ -78,6 +78,7 @@ class FsBART:
         # model/training/inference configuration
         self.name = kwargs["name"]
         self.lr = kwargs["lr"]
+        self.lr_scheduler = kwargs["lr_scheduler"]
         self.num_epochs = kwargs["num_epochs"]
         self.checkpoint = kwargs["checkpoint"]
         self.train_dev_dataset = kwargs["train_dev_dataset"]
@@ -309,12 +310,13 @@ class FsBART:
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_update_steps_per_epoch = len(self.train_dataloader)
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
-        lr_scheduler = get_scheduler(
-            "linear",
-            optimizer=optimizer,
-            num_warmup_steps=0,
-            num_training_steps=num_training_steps,
-        )
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=0,
+                num_training_steps=num_training_steps,
+            )
 
         # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
         if torch.device != "cpu":
@@ -340,7 +342,8 @@ class FsBART:
                     loss.backward()
 
                 optimizer.step()
-                lr_scheduler.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
                 optimizer.zero_grad()
                 progressbar.update(1)
 
