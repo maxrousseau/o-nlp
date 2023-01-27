@@ -49,6 +49,7 @@ bart_default_config = {
     "padding": "max_length",
     "seed": 0,
     "prefix": False,
+    "prefix_len": 128,
     "pretrained_prefix": None,
     "train_prefix": False,
     "unfreeze": False,
@@ -94,6 +95,7 @@ class FsBART:
         self.stride = kwargs["stride"]
         self.seed = kwargs["seed"]
         self.prefix = kwargs["prefix"]
+        self.prefix_len = kwargs["prefix_len"]
         self.pretrained_prefix = kwargs["pretrained_prefix"]
         self.train_prefix = kwargs["train_prefix"]
         self.unfreeze = kwargs["unfreeze"]
@@ -134,7 +136,9 @@ class FsBART:
 
             # TODO :: implement the prefix version with transformers-adapers and training code for SQuAD MI
             if self.prefix:
-                prefix_config = PrefixTuningConfig(flat=False, prefix_length=10)
+                prefix_config = PrefixTuningConfig(
+                    flat=False, prefix_length=self.prefix_len
+                )
                 self.model = BartForConditionalGeneration.from_pretrained(
                     self.checkpoint
                 )
