@@ -134,7 +134,7 @@ class FsBART:
 
             # TODO :: implement the prefix version with transformers-adapers and training code for SQuAD MI
             if self.prefix:
-                prefix_config = PrefixTuningConfig(flat=False, prefix_length=128)
+                prefix_config = PrefixTuningConfig(flat=False, prefix_length=10)
                 self.model = BartForConditionalGeneration.from_pretrained(
                     self.checkpoint
                 )
@@ -144,6 +144,7 @@ class FsBART:
                         config=prefix_config,
                         load_as="prefix_tuning",
                     )
+                    self.logger.info("pretrained prefix loaded")
 
                 else:
                     self.model.add_adapter("prefix_tuning", config=prefix_config)
@@ -415,7 +416,13 @@ class FsBART:
             self.logger.error("model initialization error")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(device)
+
+        if torch.device != "cpu":
+            accelerator = Accelerator(fp16=True)
+            (
+                self.model,
+                self.test_dataloader,
+            ) = accelerator.prepare(self.model, self.test_dataloader)
 
         # TODO if eval true then simply run on validation? otherwise use new samples from input
         # if eval:
