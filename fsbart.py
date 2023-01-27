@@ -406,7 +406,7 @@ class FsBART:
                 self.model_initialization("mi")
                 # preprocessing only validation
                 self.test_dataloader, self.proc_test_dataset = self.prepare(
-                    eval_set, shuffle=False, type="validation"
+                    self.test_dataset, shuffle=False, type="validation"
                 )
                 self.logger.info("new model initialized")
             else:
