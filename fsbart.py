@@ -37,6 +37,7 @@ bart_default_config = {
     "num_epochs": 12,
     "lr_scheduler": True,
     "checkpoint": "facebook/bart-base",
+    "tokenizer_checkpoint": "facebook/bart-base",
     "checkpoint_savedir": "./ckpt",
     "train_dev_dataset": None,
     "val_dev_dataset": None,
@@ -80,6 +81,7 @@ class FsBART:
         self.lr = kwargs["lr"]
         self.lr_scheduler = kwargs["lr_scheduler"]
         self.num_epochs = kwargs["num_epochs"]
+        self.tokenizer_checkpoint = kwargs["tokenizer_checkpoint"]
         self.checkpoint = kwargs["checkpoint"]
         self.train_dev_dataset = kwargs["train_dev_dataset"]
         self.val_dev_dataset = kwargs["val_dev_dataset"]
@@ -124,7 +126,9 @@ class FsBART:
 
     def model_initialization(self, mode):
         if mode == "mi":
-            self.tokenizer = BartTokenizerFast.from_pretrained(self.checkpoint)
+            self.tokenizer = BartTokenizerFast.from_pretrained(
+                self.tokenizer_checkpoint
+            )
             self.model = BartForConditionalGeneration.from_pretrained(self.checkpoint)
             self.logger.info("tokenizer initialized")
 
