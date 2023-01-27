@@ -403,9 +403,11 @@ class FsBART:
         """run model for inference only"""
         try:
             if init:
-                self.model_initialization(mode)
+                self.model_initialization("mi")
                 # preprocessing only validation
-                self.preprocess(self.test_dataset, "validation")
+                self.test_dataloader, self.proc_test_dataset = self.prepare(
+                    eval_set, shuffle=False, type="validation"
+                )
                 self.logger.info("new model initialized")
             else:
                 self.logger.info("using current model")
@@ -417,19 +419,26 @@ class FsBART:
 
         # TODO if eval true then simply run on validation? otherwise use new samples from input
         # if eval:
+
         self.model.eval()
-        eval_outputs = []
-        for i, batch in enumerate(self.test_dataloader):
+        answer_batch = []
+        for i, batch in enumerate(tqdm(self.test_dataloader)):
             with torch.no_grad():
-                batch.pop("offset_mapping")
-                idx = int(batch["example_id"].cpu().numpy())
-                batch.pop("example_id")
-                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = self.model.generate(
+                    **batch,
+                    max_length=100,
+                    num_beams=1,
+                )
+                for i in outputs:
+                    answer_batch.append(i)
 
-                outputs = self.model(**batch)
-                eval_outputs.append((idx, outputs.logits.cpu().numpy()))
+        predicted_answers = [self.clean_output(i) for i in answer_batch]
 
-        metrics, predictions, targets = self.eval(eval_outputs, self.test_dataset)
-        f1_score = metrics["f1"]
+        eval_outputs = list(
+            zip(self.proc_test_dataset["example_id"], predicted_answers)
+        )
+        score, predictions, targets = self.eval(eval_outputs, self.test_dataset)
+        f1_score = score["f1"]
+        self.logger.info("Zero-shot validation F1: {}".format(f1_score))
 
         return f1_score, predictions, targets
