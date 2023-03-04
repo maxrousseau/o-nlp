@@ -57,6 +57,24 @@ def load_bioasq(train_path, test_path):
     return (dev_train_set, val_set, full_train_set, test_set)
 
 
+def load_oqa_full(fpath):
+    f = open(fpath, "rb")
+    raw = json.load(f)
+    f.close()
+
+    c = [x.get("context") for x in raw]
+    q = [x.get("question") for x in raw]
+    a = [x.get("answer") for x in raw]
+    s = [x.get("answer_sentences") for x in raw]
+    uuid = [x.get("uuid") for x in raw]
+    return {
+        "question": q,
+        "context": c,
+        "answers": a,
+        "id": uuid,
+    }
+
+
 def load_mini_oqa(train_path, test_path):
     """
     Load the mini oqa dataset from json, split and transform into pytorch/hf Dataset objects import typer
