@@ -5,11 +5,11 @@ TBD 🚧
 ## Bugs 🐛
 
 - [X] fix seed during model instantiation and add function
-- [ ] fsbart post processing (example_ids) before eval...
 
 ## Todo 🎯
 
-- [ ] prefix tuning for fsbart
-- [ ] pretraining setup for fsbart
+- [ ] T5 and GLM implementations
+- [ ] T5 w/ LoRA fine-tuning
+- [ ] pretraining setup for fsbart, and others
 - [ ] dynamic ngram masking with custom dataloader
 - [ ] cpu training loop?
