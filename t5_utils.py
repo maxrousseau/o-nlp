@@ -19,6 +19,7 @@ from transformers import (
 from load_data import load_mini_oqa, formatToMI
 
 from datasets import Dataset, load_metric
+import datasets
 
 datasets.utils.logging.set_verbosity_warning
 
