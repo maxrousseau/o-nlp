@@ -144,8 +144,6 @@ class FineTuneT5(BaseTrainer):
         self.__get_dataloaders()
         local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
 
-        # @HERE :: finish setup of dataloaders and all, then get to the training and eval loops
-
         # training loop **************************************************
 
         best_f1 = -1
@@ -160,10 +158,6 @@ class FineTuneT5(BaseTrainer):
                 num_training_steps=num_training_steps,
             )
 
-        # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
-        # __import__("IPython").embed()
-        # print(torch.device())
-        # torch.device = "cpu"
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
             accelerator = Accelerator()
@@ -204,18 +198,7 @@ class FineTuneT5(BaseTrainer):
                     batch.pop("labels")
                     batch.pop("decoder_input_ids")
                     batch.pop("attention_mask")
-                    # print(batch.keys())
-                    # print(
-                    #    self.tokenizer.decode(
-                    #        batch["input_ids"][0], skip_special_tokens=True
-                    #    )
-                    # )
-                    # out = self.model.generate(**batch, max_length=25)
-                    # print(self.tokenizer.decode(out[0], skip_special_tokens=True))
-                    # quit()
-                    # @BUG :: attempt to replicate the SQuAD results from the paper bc it doesn't seem to be working
-                    # correctly right now... the F1 is <30 on 80 samples and EM is 0, the generation is noisy and
-                    # multiple <extra_id_1> are returned (number varies)
+
                     outputs = self.model.generate(
                         **batch,
                         max_length=25,
@@ -225,7 +208,6 @@ class FineTuneT5(BaseTrainer):
                         answer_batch.append(i)
 
             predicted_answers = [clean_outputs(i, self.tokenizer) for i in answer_batch]
-            print(predicted_answers)
 
             eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
 
@@ -251,10 +233,6 @@ class FineTuneT5(BaseTrainer):
                 self.logger.info("new best model saved!")
 
         self.logger.info("Best model f1 = {}".format(best_f1))
-        # return best_f1
-
-        # HERE - TODO
-        # NEXT! -> Return the best model after 35 epochs based on the top validation F1 like in the paper
 
         # @TODO :: IMPORTANT setup wandb in this class
 

@@ -195,6 +195,10 @@ def clean_outputs(output_ids, tokenizer):
     except:
         answer = ""
 
+    stop_token = answer.find("</s>")
+    if stop_token != -1:
+        answer = answer[:stop_token]
+
     return answer
 
 
