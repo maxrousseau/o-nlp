@@ -3,8 +3,8 @@ python main.py^
  --lr=2e-5^
  --epochs=1^
  --lr_scheduler=True^
- --model_checkpoint="google/t5-v1_1-base"^
- --tokenizer_checkpoint="google/t5-v1_1-base"^
+ --model_checkpoint="google/t5-v1_1-small"^
+ --tokenizer_checkpoint="google/t5-v1_1-small"^
  --train_dataset="./tmp/oqa_v0.1_train.json"^
  --test_dataset="./tmp/oqa_v0.1_test.json"^
  --max_seq_len=384^

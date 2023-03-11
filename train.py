@@ -16,6 +16,8 @@ import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
+import wandb
+
 
 class BaseTrainer:
     FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
@@ -143,6 +145,15 @@ class FineTuneT5(BaseTrainer):
         # logs the loss/results/weigths that is all....
         self.__get_dataloaders()
         local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
+        wandb.init(
+            project="o-nlp",
+            config={
+                "learning_rate": self.lr,
+                "architecture": "t5-small-test",
+                "dataset": "oqa-alpha",
+                "epochs": self.num_epochs,
+            },
+        )
 
         # training loop **************************************************
 
@@ -208,6 +219,7 @@ class FineTuneT5(BaseTrainer):
                         answer_batch.append(i)
 
             predicted_answers = [clean_outputs(i, self.tokenizer) for i in answer_batch]
+            print(predicted_answers)
 
             eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
 
@@ -221,6 +233,7 @@ class FineTuneT5(BaseTrainer):
                     epoch, float(loss.cpu()), score
                 )
             )
+            wandb.log({"loss": loss, "val_f1": f1_score})
 
             # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
@@ -235,5 +248,5 @@ class FineTuneT5(BaseTrainer):
         self.logger.info("Best model f1 = {}".format(best_f1))
 
         # @TODO :: IMPORTANT setup wandb in this class
-
+        wandb.finish()
         return None
