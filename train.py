@@ -161,7 +161,7 @@ class FineTuneT5(BaseTrainer):
         # TODO setup for GPU accelerate fp16 :: vs CPU (vanilla pytorch)
         # __import__("IPython").embed()
         # print(torch.device())
-        torch.device = "cpu"
+        # torch.device = "cpu"
         if torch.device != "cpu":
             accelerator = Accelerator(fp16=True)
             (
@@ -180,6 +180,7 @@ class FineTuneT5(BaseTrainer):
         for epoch in range(self.num_epochs):
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
+
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 if torch.device != "cpu":
@@ -199,9 +200,11 @@ class FineTuneT5(BaseTrainer):
                 with torch.no_grad():
                     batch.pop("labels")
                     batch.pop("decoder_input_ids")
+                    batch.pop("attention_mask")
+
                     outputs = self.model.generate(
                         **batch,
-                        max_length=self.max_ans_length,
+                        max_length=25,
                         num_beams=1,
                     )
                     for i in outputs:
