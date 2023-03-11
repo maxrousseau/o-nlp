@@ -1,6 +1,6 @@
-numpy
-torch
 transformers
 datasets
 accelerate
+torch
+numpy
 tqdm

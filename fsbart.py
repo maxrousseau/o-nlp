@@ -122,7 +122,7 @@ class FsBART:
         self.metric = load_metric("squad")
 
     def seed_worker(self, worker_id):
-        worker_seed = torch.initial_seed() % 2**32
+        worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
@@ -244,9 +244,6 @@ class FsBART:
         m = self.metric.compute(
             predictions=predicted_answers, references=theoretical_answers
         )
-
-        # BUG -- exact match metric doesn't seem to be working, I don't think
-        # it can bc this is a generative model?
 
         return m, predicted_answers, theoretical_answers
 
