@@ -20,6 +20,8 @@ from load_data import load_mini_oqa, formatToMI
 
 from datasets import Dataset, load_metric
 
+datasets.utils.logging.set_verbosity_warning
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -185,10 +187,10 @@ def clean_outputs(output_ids, tokenizer):
     # @BUG :: T5 tries to generate too many different masked sequences??, maybe fix with post-processing
 
     try:
-        answer_start = out.find("Answer: ") + 8
-        answer = out[answer_start:]
-        answer_end = answer.find("<extra_id")
-        answer = answer[:answer_end]
+        answer_start = out.find("<extra_id_0>") + 12
+        answer_end = out.find("<extra_id_1>")
+        # answer = answer[:answer_end]
+        answer = out[answer_start:answer_end]
     except:
         answer = ""
 
