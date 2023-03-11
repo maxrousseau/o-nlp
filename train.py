@@ -163,6 +163,7 @@ class FineTuneT5(BaseTrainer):
         # print(torch.device())
         # torch.device = "cpu"
         if torch.device != "cpu":
+            # @BUG mixed precision breaks generation
             accelerator = Accelerator()
             (
                 self.model,
@@ -203,15 +204,15 @@ class FineTuneT5(BaseTrainer):
                     batch.pop("labels")
                     batch.pop("decoder_input_ids")
                     batch.pop("attention_mask")
-                    print(batch.keys())
-                    print(
-                        self.tokenizer.decode(
-                            batch["input_ids"][0], skip_special_tokens=True
-                        )
-                    )
-                    out = self.model.generate(**batch, max_length=25)
-                    print(self.tokenizer.decode(out[0], skip_special_tokens=True))
-                    quit()
+                    # print(batch.keys())
+                    # print(
+                    #    self.tokenizer.decode(
+                    #        batch["input_ids"][0], skip_special_tokens=True
+                    #    )
+                    # )
+                    # out = self.model.generate(**batch, max_length=25)
+                    # print(self.tokenizer.decode(out[0], skip_special_tokens=True))
+                    # quit()
                     outputs = self.model.generate(
                         **batch,
                         max_length=25,
