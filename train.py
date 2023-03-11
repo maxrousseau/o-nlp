@@ -241,11 +241,11 @@ class FineTuneT5(BaseTrainer):
 
             # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
-           # save the best model
-           if f1_score > best_f1:
-               best_f1 = f1_score
-               if os.path.isfile(local_path):
-                   shutil.rmtree(local_path)
+            # save the best model
+            if f1_score > best_f1:
+                best_f1 = f1_score
+                if os.path.isfile(local_path):
+                    shutil.rmtree(local_path)
                 self.model.save_pretrained(local_path)
                 self.logger.info("new best model saved!")
 
