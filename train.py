@@ -198,9 +198,12 @@ class FineTuneT5(BaseTrainer):
             for i, batch in enumerate(tqdm(self.val_dataloader)):
                 self.model.eval()
                 with torch.no_grad():
-                    batch = batch["input_ids"]
+                    batch.pop("labels")
+                    batch.pop("decoder_input_ids")
+                    batch.pop("attention_mask")
+                    print(batch.key())
                     outputs = self.model.generate(
-                        *batch,
+                        **batch,
                         max_length=25,
                         num_beams=1,
                     )
