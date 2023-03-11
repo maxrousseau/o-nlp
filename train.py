@@ -163,7 +163,7 @@ class FineTuneT5(BaseTrainer):
         # print(torch.device())
         # torch.device = "cpu"
         if torch.device != "cpu":
-            accelerator = Accelerator(mixed_precision="fp16")
+            accelerator = Accelerator()
             (
                 self.model,
                 optimizer,
