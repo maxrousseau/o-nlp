@@ -182,14 +182,16 @@ def clean_outputs(output_ids, tokenizer):
     """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
     out = tokenizer.decode(output_ids, skip_special_tokens=True)
 
-    # try:
-    #    answer_start = out.find("Answer: ") + 8
-    #    answer_end = out.find("Context")
-    #    answer = out[answer_start:answer_end]
-    # except:
-    #    answer = ""
+    # @BUG :: T5 tries to generate too many different masked sequences??, maybe fix with post-processing
 
-    return out
+    try:
+        answer_start = out.find("Answer: ") + 8
+        answer_end = out.find("Context")
+        answer = out[answer_start:answer_end]
+    except:
+        answer = ""
+
+    return answer
 
 
 def evaluate(outputs, target_answers):

@@ -211,6 +211,9 @@ class FineTuneT5(BaseTrainer):
                     # out = self.model.generate(**batch, max_length=25)
                     # print(self.tokenizer.decode(out[0], skip_special_tokens=True))
                     # quit()
+                    # @BUG :: attempt to replicate the SQuAD results from the paper bc it doesn't seem to be working
+                    # correctly right now... the F1 is <30 on 80 samples and EM is 0, the generation is noisy and
+                    # multiple <extra_id_1> are returned (number varies)
                     outputs = self.model.generate(
                         **batch,
                         max_length=25,
@@ -233,6 +236,8 @@ class FineTuneT5(BaseTrainer):
                     epoch, float(loss.cpu()), score
                 )
             )
+
+            # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
         #    # save the best model
         #    if f1_score > best_f1:
