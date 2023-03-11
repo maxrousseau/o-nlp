@@ -223,6 +223,7 @@ class FineTuneT5(BaseTrainer):
                         answer_batch.append(i)
 
             predicted_answers = [clean_outputs(i, self.tokenizer) for i in answer_batch]
+            print(predicted_answers)
 
             eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
 
