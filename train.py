@@ -200,7 +200,7 @@ class FineTuneT5(BaseTrainer):
                 with torch.no_grad():
                     batch = batch["input_ids"]
                     outputs = self.model.generate(
-                        batch,
+                        *batch,
                         max_length=25,
                         num_beams=1,
                     )
