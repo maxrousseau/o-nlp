@@ -201,7 +201,7 @@ class FineTuneT5(BaseTrainer):
                     batch.pop("labels")
                     batch.pop("decoder_input_ids")
                     outputs = self.model.generate(
-                        **batch,
+                        **batch["input_ids"],
                         max_length=25,
                         num_beams=1,
                     )
