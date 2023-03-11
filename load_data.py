@@ -151,15 +151,13 @@ def formatToMI(dataset):
     )
 
     full_strings = pa.compute.binary_join_element_wise(
-        "Question: ", questions, " Answer: ", answers, ". Context: ", contexts, ""
+        "Question: ", questions, " Answer: ", answers, " Context: ", contexts, ""
     )
     qa_strings = pa.compute.binary_join_element_wise(
-        "Question: ", questions, " Answer: ", answers, ".", ""
+        "Question: ", questions, " Answer: ", answers, ""
     )
 
-    target_answers = pa.compute.binary_join_element_wise(
-        "<extra_id_0> ", answers, "." ""
-    )
+    target_answers = pa.compute.binary_join_element_wise("<extra_id_0> ", answers, "")
 
     gc.enable()
 
