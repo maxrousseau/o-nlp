@@ -200,8 +200,6 @@ class FineTuneT5(BaseTrainer):
                 with torch.no_grad():
                     batch.pop("labels")
                     batch.pop("decoder_input_ids")
-                    batch.pop("attention_mask")
-
                     outputs = self.model.generate(
                         **batch,
                         max_length=25,
@@ -216,7 +214,7 @@ class FineTuneT5(BaseTrainer):
 
             score, predictions, targets = evaluate(eval_outputs, val_targets)
 
-            print(list(zip(predictions, targets)))
+            # print(list(zip(predictions, targets)))
             f1_score = score["f1"]
 
             self.logger.info(
