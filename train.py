@@ -199,7 +199,7 @@ class FineTuneT5(BaseTrainer):
                 self.model.eval()
                 with torch.no_grad():
                     batch.pop("labels")
-                    # batch.pop("decoder_input_ids")
+                    batch.pop("decoder_input_ids")
                     outputs = self.model.generate(
                         **batch,
                         max_length=25,
