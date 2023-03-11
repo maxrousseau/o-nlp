@@ -141,6 +141,7 @@ class FineTuneT5(BaseTrainer):
         # We start the fine-tuning code here, essentially we feed it a model and some data and it trains it and
         # logs the loss/results/weigths that is all....
         self.__get_dataloaders()
+        local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
 
         # @HERE :: finish setup of dataloaders and all, then get to the training and eval loops
 
@@ -240,19 +241,15 @@ class FineTuneT5(BaseTrainer):
 
             # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
-        #    # save the best model
-        #    if f1_score > best_f1:
-        #        best_f1 = f1_score
-        #        if os.path.isfile(local_path):
-        #            shutil.rmtree(local_path)
-        #        if self.train_prefix:
-        #            self.model.save_adapter(local_path, "prefix_tuning")
-        #            self.logger.info("new best prefix adapter saved!")
-        #        else:
-        #            self.model.save_pretrained(local_path)
-        #            self.logger.info("new best model saved!")
-        #
-        # self.logger.info("Best model f1 = {}".format(best_f1))
+           # save the best model
+           if f1_score > best_f1:
+               best_f1 = f1_score
+               if os.path.isfile(local_path):
+                   shutil.rmtree(local_path)
+                self.model.save_pretrained(local_path)
+                self.logger.info("new best model saved!")
+
+        self.logger.info("Best model f1 = {}".format(best_f1))
         # return best_f1
 
         # HERE - TODO
