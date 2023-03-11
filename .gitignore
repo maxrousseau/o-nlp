@@ -4,3 +4,4 @@ fops/
 *.json
 *.csv
 tmp/
+wandb/

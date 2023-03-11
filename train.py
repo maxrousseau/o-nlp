@@ -247,6 +247,4 @@ class FineTuneT5(BaseTrainer):
 
         self.logger.info("Best model f1 = {}".format(best_f1))
 
-        # @TODO :: IMPORTANT setup wandb in this class
-        wandb.finish()
         return None
