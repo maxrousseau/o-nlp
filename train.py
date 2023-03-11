@@ -182,8 +182,6 @@ class FineTuneT5(BaseTrainer):
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
 
-                break
-
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 if torch.device != "cpu":
