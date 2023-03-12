@@ -208,7 +208,7 @@ def prelim_prepare_inputs(
     )
     logger.info(
         "Dataset processed and tokenized, n-train = {}, n-test = {}".format(
-            subset, len(train_tokenized_dataset), len(test_tokenized_dataset)
+            len(train_tokenized_dataset), len(test_tokenized_dataset)
         )
     )
 
@@ -306,7 +306,7 @@ def setup_prelim_finetune_t5(train_path, test_path, config):
     # @TODO :: implement val split here and return both training and validation!!!!
     config.train_batches, config.val_batches = prelim_prepare_inputs(
         config.train_dataset,
-        config.test_dataset
+        config.test_dataset,
         config.tokenizer,
         padding=config.padding,
         max_seq_length=config.max_seq_length,
