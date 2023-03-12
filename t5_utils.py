@@ -181,6 +181,40 @@ def prepare_inputs(
         Exception("Specify subset for data preparation")
 
 
+def prelim_prepare_inputs(
+    train_examples,
+    test_examples,
+    tokenizer,
+    padding=8,
+    max_seq_length=None,
+    max_ans_length=None,
+):
+    """prepare either the training, validation or test"""
+
+    train_tokenized_dataset = train_examples.map(
+        lambda example: preprocess_training(
+            example, tokenizer, padding, max_seq_length, max_ans_length
+        ),
+        batched=True,
+        remove_columns=train_examples.column_names,
+    )
+
+    test_tokenized_dataset = test_examples.map(
+        lambda example: preprocess_training(
+            example, tokenizer, padding, max_seq_length, max_ans_length
+        ),
+        batched=True,
+        remove_columns=test_examples.column_names,
+    )
+    logger.info(
+        "Dataset processed and tokenized, n-train = {}, n-test = {}".format(
+            subset, len(train_tokenized_dataset), len(test_tokenized_dataset)
+        )
+    )
+
+    return train_tokenized_dataset, test_tokenized_dataset
+
+
 def clean_outputs(output_ids, tokenizer):
     """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
     out = tokenizer.decode(output_ids, skip_special_tokens=False)
@@ -251,6 +285,32 @@ def setup_finetune_t5(train_path, test_path, config):
         padding=config.padding,
         max_seq_length=config.max_seq_length,
         subset="test",
+    )
+
+    return config
+
+
+def setup_prelim_finetune_t5(train_path, test_path, config):
+    """call t5 setup from config, return everything that is necessary for fine-tuning"""
+    oqa_dataset = load_mini_oqa(train_path, test_path)
+
+    config.train_dataset = Dataset.from_dict(formatT5MI(oqa_dataset[2]))
+    config.test_dataset = Dataset.from_dict(formatT5MI(oqa_dataset[3]))
+    logger.info("Masked QA datasets loaded from file")
+
+    config.model, config.tokenizer = t5_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+    logger.info("Model and tokenizers loaded")
+
+    # @TODO :: implement val split here and return both training and validation!!!!
+    config.train_batches, config.val_batches = prelim_prepare_inputs(
+        config.train_dataset,
+        config.test_dataset
+        config.tokenizer,
+        padding=config.padding,
+        max_seq_length=config.max_seq_length,
+        max_ans_length=config.max_ans_length,
     )
 
     return config

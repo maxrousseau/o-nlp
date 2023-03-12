@@ -85,11 +85,11 @@ class FineTuneT5(BaseTrainer):
     def __get_dataloaders(self):
         train_tensor = self.train_batches.remove_columns(["example_id"])
         val_tensor = self.val_batches.remove_columns(["example_id"])
-        test_tensor = self.val_batches.remove_columns(["example_id"])
+        # test_tensor = self.test_batches.remove_columns(["example_id"])
 
         train_tensor.set_format("torch")
         val_tensor.set_format("torch")
-        test_tensor.set_format("torch")
+        # test_tensor.set_format("torch")
 
         # create the dataloaders
         label_pad_token_id = -100
@@ -115,12 +115,12 @@ class FineTuneT5(BaseTrainer):
             collate_fn=data_collator,
             batch_size=4,
         )
-        self.test_dataloader = DataLoader(
-            test_tensor,
-            shuffle=False,
-            collate_fn=data_collator,
-            batch_size=4,
-        )
+        # self.test_dataloader = DataLoader(
+        #     test_tensor,
+        #     shuffle=False,
+        #     collate_fn=data_collator,
+        #     batch_size=4,
+        # )
         logger.info("Training, validation and test dataloaders created")
         # shuffle only train...
 
@@ -149,7 +149,7 @@ class FineTuneT5(BaseTrainer):
             project="o-nlp",
             config={
                 "learning_rate": self.lr,
-                "architecture": "t5-small-test",
+                "architecture": "t5-base-oqa-alpha",
                 "dataset": "oqa-alpha",
                 "epochs": self.num_epochs,
             },

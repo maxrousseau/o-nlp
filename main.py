@@ -76,7 +76,7 @@ def main(argv):
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
         )
-        config = t5_utils.setup_finetune_t5(train_ds_path, test_ds_path, config)
+        config = t5_utils.setup_prelim_finetune_t5(train_ds_path, test_ds_path, config)
         tuner = FineTuneT5(config)
         tuner()
 
