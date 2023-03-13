@@ -126,12 +126,41 @@ def load_mini_oqa(train_path, test_path):
     return (dev_train_set, val_set, full_train_set, test_set)
 
 
-def formatBARTMI(dataset):
-    """ """
-    None
+def bart_format_mi(dataset):
+    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
+    "Question: a question? Answer: <mask>. Context: this is the context"
+    USAGE:
+        train_raw = Dataset.from_dict(formatToMI(dset[2]))
+        test_raw = Dataset.from_dict(formatToMI(dset[3]))
+        # then you can feed those to the FsBART model class at initialization to run
+    """
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    questions = pa.array(dataset["question"])
+    answers = pa.array([i["text"][0] for i in dataset["answers"]])
+
+    masked_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: <mask>. Context: ", contexts, ""
+    )
+    full_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ". Context: ", contexts, ""
+    )
+    qa_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ".", ""
+    )
+
+    gc.enable()
+
+    return {
+        "masked_strings": masked_strings.to_pylist(),
+        "full_strings": full_strings.to_pylist(),
+        "qa_strings": qa_strings.to_pylist(),
+        "answer_strings": answers.to_pylist(),
+        "id": dataset["id"],
+    }
 
 
-def formatT5MI(dataset):
+def t5_format_mi(dataset):
     """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
     "Question: a question? Answer: <mask>. Context: this is the context"
 
@@ -151,7 +180,6 @@ def formatT5MI(dataset):
         "Question: ", questions, " Answer: <extra_id_0> Context: ", contexts, ""
     )
     # Important not to include the "." character at the end of the answer otherwise the model generates double dots
-
     target_answers = pa.compute.binary_join_element_wise("<extra_id_0> ", answers, "")
 
     gc.enable()
@@ -163,16 +191,7 @@ def formatT5MI(dataset):
     }
 
 
-# @TODO -- determine if more elaborate function needed...
-def loadOQAforRetrieval(path):
-    """ """
-    f = open(path, "rb")
-    samples = json.load(f)
-    f.close()
-    return samples
-
-
-def loadCorpus(corpus_path):
+def load_corpus(corpus_path):
     """ """
     corpus = []  # just a list of strings, each string is a page from an article
     corpus_keys = []  # list of dicts correstponding to the passage above
@@ -192,7 +211,7 @@ def loadCorpus(corpus_path):
     return (corpus, corpus_keys)
 
 
-def loadSquadMI(n=None, set=None):
+def load_squad_mi(n=None, set=None):
     """create a dataloader for SQuAD"""
 
     raw_datasets = load_dataset("squad")
