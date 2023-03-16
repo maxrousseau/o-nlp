@@ -51,6 +51,8 @@ flags.DEFINE_string(
     "tokenizer_checkpoint", None, "model checkpoint for loading pretrained weights"
 )
 flags.DEFINE_string("savedir", None, "directory for model and checkpoint export")
+
+flags.DEFINE_bool("lora", False, "finetune model with LoRA")
 # @TODO :: absl-py seems quite slow, try radicli...
 
 
@@ -75,6 +77,7 @@ def main(argv):
             max_ans_length=FLAGS.max_ans_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
+            lora=FLAGS.lora,
         )
         config = t5_utils.setup_finetune_t5(train_ds_path, test_ds_path, config)
         tuner = FineTuneT5(config)

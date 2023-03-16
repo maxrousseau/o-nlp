@@ -11,6 +11,8 @@ python main.py^
  --max_ans_len=128^
  --seed=0^
  --runmode="finetune"^
- --savedir="./test_path"
+ --lora=True^
+ --savedir="./test_path"^
+
 
 ::  for training datastet just oqa or similar formatted dataset will work (prefinetuning with SQuAD is hardcoded)

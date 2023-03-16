@@ -15,6 +15,7 @@ from transformers import (
     T5ForConditionalGeneration,
     T5Tokenizer,
 )
+from peft import LoraConfig, get_peft_model, TaskType
 
 from load_data import load_mini_oqa, t5_format_mi
 
@@ -47,6 +48,7 @@ class T5CFG:
     stride: int = 128
     padding: str = "max_length"
     seed: str = 0
+    lora: bool = False
 
     train_dataset: Dataset = None
     test_dataset: Dataset = None
@@ -63,17 +65,50 @@ class T5CFG:
     # def __repr__() -> str
 
 
-def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None):
+def print_trainable_parameters(model):
+    """
+    Prints the number of trainable parameters in the model.
+    """
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+
+    logger.info(
+        "trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}".format(
+            trainable_params, all_param, (100 * trainable_params / all_param)
+        )
+    )
+
+
+def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None, lora=False):
     """initialize model and tokenizer, mode=Default, LoRA"""
 
     model = T5ForConditionalGeneration.from_pretrained(model_checkpoint)
     tokenizer = T5Tokenizer.from_pretrained(tokenizer_checkpoint)
 
-    if mode == "lora":
+    if lora:
         # TODO add lora
-        None
+        for param in model.parameters():
+            param.requires_grad = False  # freeze the model - train adapters later
+            if param.ndim == 1:
+                # cast the small parameters (e.g. layernorm) to fp32 for stability
+                param.data = param.data.to(torch.float32)
+
+            # peft_config = LoraConfig(task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1)
+            config = LoraConfig(
+                r=8,
+                lora_alpha=32,
+                lora_dropout=0.1,
+                bias="none",
+                task_type=TaskType.SEQ_2_SEQ_LM,
+                inference_mode=False,
+            )
+            model = get_peft_model(model, config)
+            print_trainable_parameters(model)
     else:
-        None
 
     return model, tokenizer
 
