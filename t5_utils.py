@@ -108,8 +108,6 @@ def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None, lora=False):
             )
             model = get_peft_model(model, config)
             print_trainable_parameters(model)
-    else:
-
     return model, tokenizer
 
 
