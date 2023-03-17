@@ -77,7 +77,7 @@ def print_trainable_parameters(model):
             trainable_params += param.numel()
 
     logger.info(
-        "trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}".format(
+        "trainable params: {} || all params: {} || trainable%: {}".format(
             trainable_params, all_param, (100 * trainable_params / all_param)
         )
     )
@@ -101,16 +101,18 @@ def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None, lora=False):
                 # cast the small parameters (e.g. layernorm) to fp32 for stability
                 param.data = param.data.to(torch.float32)
 
-            config = LoraConfig(
-                r=8,
-                lora_alpha=32,
-                lora_dropout=0.1,
-                bias="none",
-                task_type=TaskType.SEQ_2_SEQ_LM,
-                inference_mode=False,
-            )
-            model = get_peft_model(model, config)
-            print_trainable_parameters(model)
+        config = LoraConfig(
+            r=8,
+            lora_alpha=32,
+            lora_dropout=0.1,
+            bias="none",
+            task_type=TaskType.SEQ_2_SEQ_LM,
+            inference_mode=False,
+        )
+
+        model = get_peft_model(model, config)
+    print_trainable_parameters(model)
+
     return model, tokenizer
 
 
