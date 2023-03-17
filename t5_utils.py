@@ -93,8 +93,10 @@ def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None, lora=False):
         # TODO add lora
         # hyperparams from:
         # https://github.com/huggingface/peft/blob/main/examples/conditional_generation/peft_lora_seq2seq.ipynb
-        # peft_config = LoraConfig(task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1)
-        # these work better than full fine-tuning on t5-base!!
+        # peft_config = LoraConfig(task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=8, lora_alpha=32,
+        # lora_dropout=0.1)
+        # IMPORTANT: loss should be increased and hyperparams explored for LoRA (start with 2e-4)
+        # IDK if this is truly worth exploring... maybe better to focus of further pre-training methods.
         for param in model.parameters():
             param.requires_grad = False  # freeze the model - train adapters later
             if param.ndim == 1:
