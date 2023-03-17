@@ -17,7 +17,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, TaskType
 
-from load_data import load_mini_oqa, t5_format_mi
+from load_data import load_mini_oqa, t5_format_mi, denoising_format, load_tgt
 
 from datasets import Dataset, load_metric
 import datasets
@@ -221,6 +221,69 @@ def prepare_inputs(
         Exception("Specify subset for data preparation")
 
 
+def preprocess_denoising(examples, tokenizer, padding, max_seq_length, max_ans_length):
+    """preprocess for"""
+
+    # @TODO :: look at fsbart paper for the t5 preprocessing...
+    source, target = examples["masked_strings"], examples["target_strings"]
+    source_tokenized = tokenizer(
+        source,
+        padding=padding,
+        max_length=max_seq_length,
+        truncation=True,
+    )
+
+    batch = {k: v for k, v in source_tokenized.items()}
+
+    target_tokenized = tokenizer(
+        target,
+        padding=padding,
+        max_length=max_ans_length,
+        truncation=True,
+    )
+
+    # Ignore padding in the loss
+    batch["labels"] = [
+        [-100 if token == tokenizer.pad_token_id else token for token in l]
+        for l in target_tokenized["input_ids"]
+    ]
+
+    batch["example_id"] = examples["id"]
+
+    return batch
+
+
+def prepare_inputs_denoising(
+    examples,
+    tokenizer,
+    padding=8,
+    max_seq_length=None,
+    max_ans_length=None,
+    test_size=0.2,
+):
+    """ """
+    tokenized_dataset = examples.map(
+        lambda example: preprocess_training(
+            example, tokenizer, padding, max_seq_length, max_ans_length
+        ),
+        batched=True,
+        remove_columns=examples.column_names,
+    )
+
+    tokenized_dataset = tokenized_dataset.train_test_split(
+        test_size=test_size, shuffle=False
+    )  # training/test were
+    # shuffled prior to loading
+
+    logger.info(
+        "{} dataset processed and tokenized, n-train = {}, n-val = {}".format(
+            subset, len(tokenized_dataset["train"]), len(tokenized_dataset["test"])
+        )
+    )
+
+    return tokenized_dataset["train"], tokenized_dataset["test"]
+
+
 def clean_outputs(output_ids, tokenizer):
     """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
     out = tokenizer.decode(output_ids, skip_special_tokens=False)
@@ -292,5 +355,32 @@ def setup_finetune_t5(train_path, test_path, config):
         max_seq_length=config.max_seq_length,
         subset="test",
     )
+
+    return config
+
+
+def setup_pretrain_t5(data_path, config):
+    """call t5 setup from config, return everything that is necessary for fine-tuning"""
+    tgt_dataset = load_tgt(data_path, n=1000)
+
+    config.train_dataset = Dataset.from_dict(denoising_format(tgt_dataset))
+    logger.info("Masked tgt datasets loaded from file")
+
+    config.model, config.tokenizer = t5_init(
+        config.model_checkpoint, config.tokenizer_checkpoint, lora=False
+    )
+    logger.info("Model and tokenizers loaded")
+
+    # @TODO :: implement val split here and return both training and validation!!!!
+    config.train_batches, config.val_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        padding=config.padding,
+        max_seq_length=config.max_seq_length,
+        max_ans_length=config.max_ans_length,
+        subset="train",
+    )
+
+    config.test_batches = None
 
     return config

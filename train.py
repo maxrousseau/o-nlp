@@ -124,7 +124,7 @@ class FineTuneT5(BaseTrainer):
         logger.info("Training, validation and test dataloaders created")
         # shuffle only train...
 
-    def get_val_answers(self):
+        def __get_val_answers(self):
         """ """
         val_targets = []
         for sample in self.val_batches["labels"]:
@@ -183,7 +183,7 @@ class FineTuneT5(BaseTrainer):
 
         progressbar = tqdm(range(num_training_steps))
 
-        val_targets = self.get_val_answers()
+        val_targets = self.__get_val_answers()
 
         for epoch in range(self.num_epochs):
             self.model.train()
@@ -248,5 +248,123 @@ class FineTuneT5(BaseTrainer):
         # @TODO :: next re
 
         self.logger.info("Best model f1 = {}".format(best_f1))
+
+        return None
+
+
+class PretrainT5(BaseTrainer):
+    """ """
+
+    def __init_(self):
+        super().__init__(config)
+
+    def __get_val_answers(self):
+        """ """
+        val_targets = []
+        for sample in self.val_batches["labels"]:
+            val_targets.append(
+                self.tokenizer.decode(
+                    [tok for tok in sample if tok != -100], skip_special_tokens=True
+                )
+            )
+
+        return Dataset.from_dict(
+            {"id": self.val_batches["example_id"], "answer_strings": val_targets}
+        )
+
+    def __get_dataloaders(self):
+        train_tensor = self.train_batches.remove_columns(["example_id"])
+        val_tensor = self.val_batches.remove_columns(["example_id"])
+
+        train_tensor.set_format("torch")
+        val_tensor.set_format("torch")
+
+        # create the dataloaders
+        label_pad_token_id = -100
+        data_collator = DataCollatorForSeq2Seq(
+            self.tokenizer,
+            model=self.model,
+            label_pad_token_id=label_pad_token_id,
+            pad_to_multiple_of=8,
+        )
+
+        self.train_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=data_collator,
+            batch_size=4,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+        self.val_dataloader = DataLoader(
+            val_tensor,
+            shuffle=False,
+            collate_fn=data_collator,
+            batch_size=4,
+        )
+
+        logger.info("Training, validation dataloaders created")
+        # shuffle only train...
+
+    def __save_checkpoint(self):
+        # @TODO
+        return None
+
+    def __call__(self):
+        """ """
+        self.__get_dataloaders()
+        local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
+
+        wandb.init(
+            project="o-nlp",
+            config={
+                "learning_rate": self.lr,
+                "architecture": "t5-small-test",
+                "dataset": "oqa-alpha",
+                "epochs": self.num_epochs,
+            },
+        )
+
+        best_f1 = -1
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+
+
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=0,
+                num_training_steps=num_training_steps,
+            )
+
+        if torch.device != "cpu":
+            # @BUG mixed precision breaks generation
+            accelerator = Accelerator()
+            (
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                self.val_dataloader,
+            ) = accelerator.prepare(
+                self.model, optimizer, self.train_dataloader, self.val_dataloader
+            )
+
+        progressbar = tqdm(range(num_training_steps))
+
+        val_targets = self.__get_val_answers()
+
+        # @TODO :: get_num_masked_tokens
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            for steps, batch in enumerate(self.dataloader):
+
+
+
+
+
+
 
         return None

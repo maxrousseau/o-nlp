@@ -6,6 +6,33 @@ from datasets import load_dataset
 import pyarrow as pa
 
 
+def load_tgt(path, n_samples):
+    """get the masked pattern json file, load n-samples"""
+    f = open(path, "rb")
+    dataset = json.load(f)
+    f.close
+
+    dataset = dataset[:n_samples]
+
+    c = [x.get("context") for x in dataset]
+    t = [x.get("target") for x in dataset]
+
+    i = 0
+    ids = []
+    for sample in dataset:
+        c_id = sample.get("id")
+        ids.append("{}-{}".format(c_id, i))
+        i += 1
+
+    return {
+        "context": c,
+        "targets": t,
+        "id": ids,
+    }
+
+    return dataset[:n_samples]
+
+
 def load_bioasq(train_path, test_path):
     """
     Load the bioasq dataset from json, split and transform into pytorch/hf Dataset objects import typer
@@ -124,6 +151,25 @@ def load_mini_oqa(train_path, test_path):
     test_set = Dataset.from_dict(test_dict, split="test")
 
     return (dev_train_set, val_set, full_train_set, test_set)
+
+
+def denoising_format(dataset):
+    """Format for denoising"""
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    target = pa.array(dataset["targets"])
+
+    masked_strings = pa.compute.replace_substring(contexts, "[MASK]", "<extra_id_0>")
+    # Important not to include the "." character at the end of the answer otherwise the model generates double dots
+    target_string = pa.compute.binary_join_element_wise("<extra_id_0> ", target, "")
+
+    gc.enable()
+
+    return {
+        "masked_strings": masked_strings.to_pylist(),
+        "target_strings": target_string.to_pylist(),
+        "id": dataset["id"],
+    }
 
 
 def bart_format_mi(dataset):
