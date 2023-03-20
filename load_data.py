@@ -161,7 +161,9 @@ def denoising_format(dataset):
 
     masked_strings = pa.compute.replace_substring(contexts, "[MASK]", "<extra_id_0>")
     # Important not to include the "." character at the end of the answer otherwise the model generates double dots
-    target_string = pa.compute.binary_join_element_wise("<extra_id_0> ", target, "")
+    target_string = pa.compute.binary_join_element_wise(
+        "<extra_id_0> ", target, "<extra_id_1>", ""
+    )
 
     gc.enable()
 
@@ -226,7 +228,9 @@ def t5_format_mi(dataset):
         "Question: ", questions, " Answer: <extra_id_0> Context: ", contexts, ""
     )
     # Important not to include the "." character at the end of the answer otherwise the model generates double dots
-    target_answers = pa.compute.binary_join_element_wise("<extra_id_0> ", answers, "")
+    target_answers = pa.compute.binary_join_element_wise(
+        "<extra_id_0> ", answers, "<extra_id_1>", ""
+    )
 
     gc.enable()
 

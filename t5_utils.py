@@ -263,7 +263,7 @@ def prepare_inputs_denoising(
 ):
     """ """
     tokenized_dataset = examples.map(
-        lambda example: preprocess_training(
+        lambda example: preprocess_denoising(
             example, tokenizer, padding, max_seq_length, max_ans_length
         ),
         batched=True,
@@ -276,8 +276,8 @@ def prepare_inputs_denoising(
     # shuffled prior to loading
 
     logger.info(
-        "{} dataset processed and tokenized, n-train = {}, n-val = {}".format(
-            subset, len(tokenized_dataset["train"]), len(tokenized_dataset["test"])
+        "Pretraining dataset processed and tokenized, n-train = {}, n-val = {}".format(
+            len(tokenized_dataset["train"]), len(tokenized_dataset["test"])
         )
     )
 
@@ -313,6 +313,26 @@ def evaluate(outputs, target_answers):
     for idx, predicted_answer in outputs:
         label_answer = target_answers.filter(lambda sample: sample["id"] == idx)[
             "answer_strings"
+        ]
+        theoretical_answers.append(
+            {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
+        )
+        predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
+
+    metric = load_metric("squad")
+    m = metric.compute(predictions=predicted_answers, references=theoretical_answers)
+
+    return m, predicted_answers, theoretical_answers
+
+
+def evaluate_pretraining(outputs, target_answers):
+    """..."""
+    theoretical_answers = []
+    predicted_answers = []
+
+    for idx, predicted_answer in outputs:
+        label_answer = target_answers.filter(lambda sample: sample["id"] == idx)[
+            "target_strings"
         ]
         theoretical_answers.append(
             {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
@@ -361,7 +381,7 @@ def setup_finetune_t5(train_path, test_path, config):
 
 def setup_pretrain_t5(data_path, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
-    tgt_dataset = load_tgt(data_path, n=1000)
+    tgt_dataset = load_tgt(data_path, n_samples=-1)
 
     config.train_dataset = Dataset.from_dict(denoising_format(tgt_dataset))
     logger.info("Masked tgt datasets loaded from file")
@@ -372,13 +392,12 @@ def setup_pretrain_t5(data_path, config):
     logger.info("Model and tokenizers loaded")
 
     # @TODO :: implement val split here and return both training and validation!!!!
-    config.train_batches, config.val_batches = prepare_inputs(
+    config.train_batches, config.val_batches = prepare_inputs_denoising(
         config.train_dataset,
         config.tokenizer,
         padding=config.padding,
         max_seq_length=config.max_seq_length,
         max_ans_length=config.max_ans_length,
-        subset="train",
     )
 
     config.test_batches = None

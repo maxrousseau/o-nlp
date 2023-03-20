@@ -124,7 +124,7 @@ class FineTuneT5(BaseTrainer):
         logger.info("Training, validation and test dataloaders created")
         # shuffle only train...
 
-        def __get_val_answers(self):
+    def __get_val_answers(self):
         """ """
         val_targets = []
         for sample in self.val_batches["labels"]:
@@ -219,7 +219,7 @@ class FineTuneT5(BaseTrainer):
                         answer_batch.append(i)
 
             predicted_answers = [clean_outputs(i, self.tokenizer) for i in answer_batch]
-            print(predicted_answers)
+            # print(predicted_answers)
 
             eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
 
@@ -269,7 +269,7 @@ class PretrainT5(BaseTrainer):
             )
 
         return Dataset.from_dict(
-            {"id": self.val_batches["example_id"], "answer_strings": val_targets}
+            {"id": self.val_batches["example_id"], "target_strings": val_targets}
         )
 
     def __get_dataloaders(self):
@@ -292,7 +292,7 @@ class PretrainT5(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=16,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -301,15 +301,11 @@ class PretrainT5(BaseTrainer):
             val_tensor,
             shuffle=False,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=16,
         )
 
         logger.info("Training, validation dataloaders created")
         # shuffle only train...
-
-    def __save_checkpoint(self):
-        # @TODO
-        return None
 
     def __call__(self):
         """ """
@@ -331,18 +327,17 @@ class PretrainT5(BaseTrainer):
         num_update_steps_per_epoch = len(self.train_dataloader)
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
 
-
         if self.lr_scheduler:
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=0,
+                num_warmup_steps=10,
                 num_training_steps=num_training_steps,
             )
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
-            accelerator = Accelerator()
+            accelerator = Accelerator(project_dir=self.checkpoint_savedir)
             (
                 self.model,
                 optimizer,
@@ -351,20 +346,82 @@ class PretrainT5(BaseTrainer):
             ) = accelerator.prepare(
                 self.model, optimizer, self.train_dataloader, self.val_dataloader
             )
+            accelerator.register_for_checkpointing(lr_scheduler)
 
         progressbar = tqdm(range(num_training_steps))
 
         val_targets = self.__get_val_answers()
+        n_masked_tokens = 0
+        save_threshold = 0
 
-        # @TODO :: get_num_masked_tokens
         for epoch in range(self.num_epochs):
             self.model.train()
-            for steps, batch in enumerate(self.dataloader):
+            for steps, batch in enumerate(self.train_dataloader):
 
+                flabels = batch["labels"].flatten().cpu()
+                n_masked_tokens += len(flabels[flabels >= 0]) - 2
+                logger.info(
+                    "epoch {} : n_masked_tokens {} ".format(epoch, n_masked_tokens)
+                )
 
+                outputs = self.model(**batch)
 
+                loss = outputs.loss
+                if torch.device != "cpu":
+                    accelerator.backward(loss)
+                else:
+                    loss.backward()
 
+                optimizer.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
 
+                if (
+                    int(n_masked_tokens / 1000) > save_threshold
+                ):  # save initial checkpoint then each 1k masked tokens
+                    # (ckpt_num * 1000)
+                    save_threshold = int(n_masked_tokens / 1000)
+                    accelerator.save_state("test_checkpoints")
+                    logger.info(
+                        "chekpoint saved at {} masked tokens".format(
+                            save_threshold * 1000
+                        )
+                    )
+                    self.model.eval()
+                    answer_batch = []
+                    for i, batch in enumerate(tqdm(self.val_dataloader)):
 
+                        with torch.no_grad():
+                            batch.pop("labels")
+                            batch.pop("decoder_input_ids")
+                            batch.pop("attention_mask")
+
+                            outputs = self.model.generate(
+                                **batch,
+                                max_length=25,
+                                num_beams=1,
+                            )
+                            for i in outputs:
+                                answer_batch.append(i)
+                    predicted_answers = [
+                        clean_outputs(i, self.tokenizer) for i in answer_batch
+                    ]
+                    eval_outputs = list(
+                        zip(self.val_batches["example_id"], predicted_answers)
+                    )
+                    score, predictions, targets = evaluate_pretraining(
+                        eval_outputs, val_targets
+                    )
+
+                    f1_score = score["f1"]
+                    self.logger.info(
+                        "step: {}, Loss: {}, Validation F1: {}".format(
+                            steps, float(loss.cpu()), score
+                        )
+                    )
+                    wandb.log({"val_f1": f1_score})
+                wandb.log({"loss": loss})
 
         return None

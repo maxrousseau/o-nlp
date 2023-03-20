@@ -3,7 +3,7 @@ import os
 import logging
 
 import t5_utils
-from train import FineTuneT5
+from train import FineTuneT5, PretrainT5
 
 
 from absl import app
@@ -98,7 +98,8 @@ def main(argv):
             runmode=FLAGS.runmode,
         )
         config = t5_utils.setup_pretrain_t5(train_ds_path, config)
-
+        pretrainer = PretrainT5(config)
+        pretrainer()
     else:
         None
 
