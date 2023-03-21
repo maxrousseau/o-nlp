@@ -6,13 +6,14 @@ from datasets import load_dataset
 import pyarrow as pa
 
 
-def load_tgt(path, n_samples):
+def load_tgt(path, n_samples=-1):
     """get the masked pattern json file, load n-samples"""
     f = open(path, "rb")
     dataset = json.load(f)
     f.close
 
-    dataset = dataset[:n_samples]
+    if n_samples > 0:
+        dataset = dataset[:n_samples]
 
     c = [x.get("context") for x in dataset]
     t = [x.get("target") for x in dataset]
@@ -29,8 +30,6 @@ def load_tgt(path, n_samples):
         "targets": t,
         "id": ids,
     }
-
-    return dataset[:n_samples]
 
 
 def load_bioasq(train_path, test_path):
@@ -84,7 +83,7 @@ def load_bioasq(train_path, test_path):
     return (dev_train_set, val_set, full_train_set, test_set)
 
 
-def load_oqa_full(fpath):
+def load_oqa(fpath):
     f = open(fpath, "rb")
     raw = json.load(f)
     f.close()
@@ -102,6 +101,7 @@ def load_oqa_full(fpath):
     }
 
 
+# @TODO :: get rid of this function in the codebase
 def load_mini_oqa(train_path, test_path):
     """
     Load the mini oqa dataset from json, split and transform into pytorch/hf Dataset objects import typer

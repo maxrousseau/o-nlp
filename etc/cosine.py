@@ -1,10 +1,17 @@
 import os
 
 import numpy as np
-
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModel
 import torch
 
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).absolute().parents[1]))
+from load_data import load_oqa, load_tgt
+
+from datasets import Dataset
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -80,7 +87,7 @@ def loop_cos(answers, samples):
     return c
 
 
-def filter_patterns(answers, target_dataset, threshold=0.7):
+def filter_patterns(answers, target_dataset):
     """for each target pattern, filter by the cosine similarity for a given threshold"""
 
     # @NOTE :: start with a ratio of 0.7 and look at the output to re-adjust
@@ -94,7 +101,7 @@ def filter_patterns(answers, target_dataset, threshold=0.7):
 
     # slow...
     answers_embeddings = []
-    for a in answers:
+    for a in tqdm(answers):
         _, embed = embed_string(a, tokenizer, model)
         answers_embeddings.append(embed.squeeze())
 
@@ -107,7 +114,7 @@ def filter_patterns(answers, target_dataset, threshold=0.7):
 
     max_cosine_sim = np.apply_along_axis(f, 1, target_embeddings)
     embedded_targets_dataset = embedded_targets_dataset.add_column(
-        "cosine_similarity", max_cos_sim
+        "cosine_similarity", max_cosine_sim
     )
 
     # embedded_targets_dataset["max_cos_sim"] = max_cosine_sim
@@ -119,11 +126,17 @@ def filter_patterns(answers, target_dataset, threshold=0.7):
     # filter dataset from threshold
 
 
-# oqa_full = load_oqa_full("c:/Users/roum5/source/data/oqa/oqa-v0.4-26feb2023.json")
-# test_tgt = load_tgt("c:/Users/roum5/source/o-nlp/tmp/ngram-tgt-test.json", n_samples=100)
-# all_answers = oqa_full["answers"]
-# cos_fil_ds = filter_patterns(all_answers, test_tgt)
+def main():
+    qa = load_oqa("c:/Users/roum5/source/data/oqa/oqa-v0.4-26feb2023.json")
+    tgt_patterns_ds = Dataset.from_dict(
+        load_tgt("c:/Users/roum5/source/o-nlp/tmp/ngram-tgt-test.json", n_samples=-1)
+    )
+    all_answers = qa["answers"]
+    cos_fil_ds = filter_patterns(all_answers, tgt_patterns_ds)
 
-# The technique seems to work!!, the threshold may need to be set at around 0.80.
+    cos_fil_ds.save_to_disk("./targets-cosine")
+    # The technique seems to work!!, the threshold may need to be set at around 0.80
 
-# @TODO try with 100 samples and read ouput of best, worst, mean and determine a ballpark threshold (might be very high)
+
+if __name__ == "__main__":
+    main()
