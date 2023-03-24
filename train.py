@@ -318,7 +318,7 @@ class PretrainT5(BaseTrainer):
             project="o-nlp",
             config={
                 "learning_rate": self.lr,
-                "architecture": "t5-small-test",
+                "architecture": "t5-pretraining-test",
                 "dataset": "oqa-alpha",
                 "epochs": self.num_epochs,
             },
@@ -382,14 +382,14 @@ class PretrainT5(BaseTrainer):
                 progressbar.update(1)
 
                 if (
-                    int(n_masked_tokens / 1000) > save_threshold
+                    int(n_masked_tokens / 10000) > save_threshold
                 ):  # save initial checkpoint then each 1k masked tokens
                     # (ckpt_num * 1000)
-                    save_threshold = int(n_masked_tokens / 1000)
+                    save_threshold = int(n_masked_tokens / 10000)
                     accelerator.save_state("test_checkpoints")
                     logger.info(
                         "chekpoint saved at {} masked tokens".format(
-                            save_threshold * 1000
+                            save_threshold * 10000
                         )
                     )
                     self.model.eval()

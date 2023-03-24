@@ -284,6 +284,7 @@ def prepare_inputs_denoising(
     return tokenized_dataset["train"], tokenized_dataset["test"]
 
 
+# @TODO :: vectorize this!!! quite slow...
 def clean_outputs(output_ids, tokenizer):
     """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
     out = tokenizer.decode(output_ids, skip_special_tokens=False)
