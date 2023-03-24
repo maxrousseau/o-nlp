@@ -382,14 +382,14 @@ class PretrainT5(BaseTrainer):
                 progressbar.update(1)
 
                 if (
-                    int(n_masked_tokens / 10000) > save_threshold
+                    int(n_masked_tokens / 20000) > save_threshold
                 ):  # save initial checkpoint then each 1k masked tokens
                     # (ckpt_num * 1000)
-                    save_threshold = int(n_masked_tokens / 10000)
+                    save_threshold = int(n_masked_tokens / 20000)
                     accelerator.save_state("test_checkpoints")
                     logger.info(
                         "chekpoint saved at {} masked tokens".format(
-                            save_threshold * 10000
+                            save_threshold * 20000
                         )
                     )
                     self.model.eval()
