@@ -363,9 +363,9 @@ class PretrainT5(BaseTrainer):
 
                 flabels = batch["labels"].flatten().cpu()
                 n_masked_tokens += len(flabels[flabels >= 0]) - 2
-                logger.info(
-                    "epoch {} : n_masked_tokens {} ".format(epoch, n_masked_tokens)
-                )
+                # logger.info(
+                #     "epoch {} : n_masked_tokens {} ".format(epoch, n_masked_tokens)
+                # )
 
                 outputs = self.model(**batch)
 
@@ -395,37 +395,11 @@ class PretrainT5(BaseTrainer):
                     self.model.eval()
                     answer_batch = []
                     for i, batch in enumerate(tqdm(self.val_dataloader)):
+                        outputs = self.model(**batch)
+                        val_loss = outputs.loss
 
-                        with torch.no_grad():
-                            batch.pop("labels")
-                            batch.pop("decoder_input_ids")
-                            batch.pop("attention_mask")
-
-                            outputs = self.model.generate(
-                                **batch,
-                                max_length=25,
-                                num_beams=1,
-                            )
-                            for i in outputs:
-                                answer_batch.append(i)
-                    predicted_answers = [
-                        clean_outputs(i, self.tokenizer) for i in answer_batch
-                    ]
-                    eval_outputs = list(
-                        zip(self.val_batches["example_id"], predicted_answers)
-                    )
-                    score, predictions, targets = evaluate_pretraining(
-                        eval_outputs, val_targets
-                    )
-
-                    f1_score = score["f1"]
-                    self.logger.info(
-                        "step: {}, Loss: {}, Validation F1: {}".format(
-                            steps, float(loss.cpu()), score
-                        )
-                    )
                     wandb.log(
-                        {"val_f1": f1_score, "loss": loss}
+                        {"val_loss": val_loss, "train_loss": loss}
                     )  # TODO add val loss (accumulate)
 
         self.model.save_pretrained(local_path)

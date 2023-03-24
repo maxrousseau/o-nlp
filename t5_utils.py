@@ -259,7 +259,7 @@ def prepare_inputs_denoising(
     padding=8,
     max_seq_length=None,
     max_ans_length=None,
-    test_size=0.2,
+    test_size=0.05,
 ):
     """ """
     tokenized_dataset = examples.map(
