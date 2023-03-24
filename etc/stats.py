@@ -8,6 +8,8 @@ import pyarrow as pa
 
 from nltk.tokenize import word_tokenize
 
+from datasets import Dataset
+
 # @TODO :: implement and compute those statistics
 
 
@@ -57,6 +59,27 @@ def qa_stats(contexts, questions, answers):
     return stats
 
 
+def tap_stats(dataset):
+    """ """
+    # tgt_cos_ds = Dataset.load_from_disk("../target_cosine")
+    # tgt_fil = tgt_cos_ds.filter(lambda example: example["cosine_similarity"] >= threshold)
+    contexts = pa.array(dataset["context"]).to_pylist()
+    targets = pa.array(dataset["targets"]).to_pylist()
+
+    t_len = [len(word_tokenize(t.lower())) for t in targets]
+    c_len = [len(word_tokenize(c.lower())) for c in contexts]
+
+    t_len_mu, t_len_sd = np.mean(t_len), np.std(t_len)
+    c_len_mu, c_len_sd = np.mean(c_len), np.std(c_len)
+
+    return {"targets": (t_len_mu, t_len_sd), "contexts": (c_len_mu, c_len_sd)}
+
+
+# possibly add a filter to remove outliers like single token answer and answers that are beyond a certain length? TBD,
+# also possible to set the threshold as a tunable hyperparameter?? -> currently seems like 85 gives decent samples,
+# although somewhat noisy.
+
+
 def main():
     import sys
     from pathlib import Path
@@ -93,5 +116,5 @@ def main():
         json.dump(results, f, ensure_ascii=False, indent=4)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+# main()
