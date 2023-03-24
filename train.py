@@ -292,7 +292,7 @@ class PretrainT5(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=data_collator,
-            batch_size=8,
+            batch_size=4,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -301,7 +301,7 @@ class PretrainT5(BaseTrainer):
             val_tensor,
             shuffle=False,
             collate_fn=data_collator,
-            batch_size=8,
+            batch_size=4,
         )
 
         logger.info("Training, validation dataloaders created")
