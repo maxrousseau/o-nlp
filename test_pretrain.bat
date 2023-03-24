@@ -5,10 +5,10 @@ python main.py^
  --lr_scheduler=False^
  --model_checkpoint="google/t5-v1_1-small"^
  --tokenizer_checkpoint="google/t5-v1_1-small"^
- --train_dataset="./tmp/ngram-tgt-test.json"^
- --max_seq_len=384^
+ --train_dataset="./etc/tgt-beta-0.85t-86k"^
+ --max_seq_len=512^
  --max_ans_len=128^
  --seed=0^
  --runmode="pretrain"^
- --lora=True^
+ --lora=False^
  --savedir="./test_path"^

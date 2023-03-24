@@ -167,11 +167,13 @@ def denoising_format(dataset):
 
     gc.enable()
 
-    return {
-        "masked_strings": masked_strings.to_pylist(),
-        "target_strings": target_string.to_pylist(),
-        "id": dataset["id"],
-    }
+    return Dataset.from_dict(
+        {
+            "masked_strings": masked_strings.to_pylist(),
+            "target_strings": target_string.to_pylist(),
+            "id": dataset["id"],
+        }
+    )
 
 
 def bart_format_mi(dataset):

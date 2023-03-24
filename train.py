@@ -310,7 +310,9 @@ class PretrainT5(BaseTrainer):
     def __call__(self):
         """ """
         self.__get_dataloaders()
-        local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
+        local_path = os.path.abspath(
+            "{}-{}-fullrun".format(self.checkpoint_savedir, self.name)
+        )
 
         wandb.init(
             project="o-nlp",
@@ -346,7 +348,8 @@ class PretrainT5(BaseTrainer):
             ) = accelerator.prepare(
                 self.model, optimizer, self.train_dataloader, self.val_dataloader
             )
-            accelerator.register_for_checkpointing(lr_scheduler)
+            if self.lr_scheduler:
+                accelerator.register_for_checkpointing(lr_scheduler)
 
         progressbar = tqdm(range(num_training_steps))
 
@@ -421,7 +424,10 @@ class PretrainT5(BaseTrainer):
                             steps, float(loss.cpu()), score
                         )
                     )
-                    wandb.log({"val_f1": f1_score})
-                wandb.log({"loss": loss})
+                    wandb.log(
+                        {"val_f1": f1_score, "loss": loss}
+                    )  # TODO add val loss (accumulate)
+
+        self.model.save_pretrained(local_path)
 
         return None
