@@ -307,6 +307,17 @@ class PretrainT5(BaseTrainer):
         logger.info("Training, validation dataloaders created")
         # shuffle only train...
 
+    @torch.no_grad()
+    def __eval(self, losses):
+        self.model.eval()
+        # @BUG for some reason this is about 4x slower than training ? Ok Fixed
+        for i, batch in enumerate(tqdm(self.val_dataloader)):
+            outputs = self.model(**batch)
+            losses["val"].append(outputs.loss.item())
+            # accumulate val_losses losses["val"]
+        self.model.train()
+        return losses
+
     def __call__(self):
         """ """
         self.__get_dataloaders()
@@ -358,9 +369,8 @@ class PretrainT5(BaseTrainer):
         save_threshold = 0
         losses = {"train": [], "val": []}
         n_step = 0
-
+        self.model.train()
         for epoch in range(self.num_epochs):
-            self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
 
                 flabels = batch["labels"].flatten().cpu()
@@ -401,13 +411,7 @@ class PretrainT5(BaseTrainer):
                             n_step, n_masked_tokens
                         )
                     )
-                    # @TODO :: move this to an __eval() function
-                    self.model.eval()
-
-                    for i, batch in enumerate(tqdm(self.val_dataloader)):
-                        outputs = self.model(**batch)
-                        losses["val"].append(outputs.loss.item())
-                        # accumulate val_losses losses["val"]
+                    losses = self.__eval(losses)
 
                     # @TODO :: get mean training and val losses, reset the losses arrays, log n_masked_tokens, step and
                     # more
