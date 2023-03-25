@@ -10,7 +10,7 @@ wandb login 7a817528b63f37a967ac341e84ae3ba00dd9f18e
 
 python main.py \
  --name="t5-default-pretrain" \
- --lr=1e-4 \
+ --lr=2e-5 \
  --epochs=1 \
  --lr_scheduler=False \
  --model_checkpoint="google/t5-v1_1-base" \
