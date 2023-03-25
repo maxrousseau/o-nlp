@@ -333,13 +333,13 @@ class PretrainT5(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=10,
+                num_warmup_steps=100,
                 num_training_steps=num_training_steps,
             )
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
-            accelerator = Accelerator(project_dir=self.checkpoint_savedir)
+            accelerator = Accelerator()
             (
                 self.model,
                 optimizer,
@@ -356,6 +356,8 @@ class PretrainT5(BaseTrainer):
         val_targets = self.__get_val_answers()
         n_masked_tokens = 0
         save_threshold = 0
+        losses = {"train": [], "val": []}
+        n_step = 0
 
         for epoch in range(self.num_epochs):
             self.model.train()
@@ -370,11 +372,16 @@ class PretrainT5(BaseTrainer):
                 outputs = self.model(**batch)
 
                 loss = outputs.loss
+                losses["train"].append(loss.item())
+
+                # __import__("IPython").embed()
+
                 if torch.device != "cpu":
                     accelerator.backward(loss)
                 else:
                     loss.backward()
 
+                # @TODO :: accumulate training losses in numpy array losses["train"]
                 optimizer.step()
                 if self.lr_scheduler:
                     lr_scheduler.step()
@@ -386,21 +393,34 @@ class PretrainT5(BaseTrainer):
                 ):  # save initial checkpoint then each 1k masked tokens
                     # (ckpt_num * 1000)
                     save_threshold = int(n_masked_tokens / 20000)
-                    accelerator.save_state("test_checkpoints")
+                    accelerator.save_state(
+                        "./ckpts/{}-{}".format(self.name, n_masked_tokens)
+                    )
                     logger.info(
-                        "chekpoint saved at {} masked tokens".format(
-                            save_threshold * 20000
+                        "chekpoint saved at step {} after {} masked tokens".format(
+                            n_step, n_masked_tokens
                         )
                     )
+                    # @TODO :: move this to an __eval() function
                     self.model.eval()
-                    answer_batch = []
+
                     for i, batch in enumerate(tqdm(self.val_dataloader)):
                         outputs = self.model(**batch)
-                        val_loss = outputs.loss
+                        losses["val"].append(outputs.loss.item())
+                        # accumulate val_losses losses["val"]
 
+                    # @TODO :: get mean training and val losses, reset the losses arrays, log n_masked_tokens, step and
+                    # more
                     wandb.log(
-                        {"val_loss": val_loss, "train_loss": loss}
-                    )  # TODO add val loss (accumulate)
+                        {
+                            "val_loss": np.array(losses["val"]).mean(),
+                            "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": n_step,
+                            "num_masked_tokens": n_masked_tokens,
+                        }
+                    )
+                    losses = {"train": [], "val": []}
+                n_step += 1
 
         self.model.save_pretrained(local_path)
 
