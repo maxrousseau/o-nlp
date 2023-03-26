@@ -404,6 +404,7 @@ class PretrainT5(BaseTrainer):
                 if n_step <= self.checkpoint_step:
                     flabels = batch["labels"].flatten().cpu()
                     n_masked_tokens += len(flabels[flabels >= 0]) - 2
+                    save_threshold = int(n_masked_tokens / 20000)
                     n_step += 1
                 else:
                     break
@@ -445,7 +446,7 @@ class PretrainT5(BaseTrainer):
                 progressbar.update(1)
 
                 if (
-                    int(n_masked_tokens / 1) > save_threshold
+                    int(n_masked_tokens / 20000) > save_threshold
                 ):  # save initial checkpoint then each 1k masked tokens
                     # (ckpt_num * 1000)
                     save_threshold = int(n_masked_tokens / 20000)
