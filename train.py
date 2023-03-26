@@ -316,16 +316,16 @@ class PretrainT5(BaseTrainer):
     def __save_checkpoint(self, accelerator, n_masked_tokens, n_step):
         ckpt_path = "./ckpts/"
         ckpt_max = 5
+
+        if not os.path.exists(ckpt_path):
+            os.makedirs(ckpt_path)
+
         dirs = [
             os.path.relpath(ckpt_path + f.name)
             for f in os.scandir(ckpt_path)
             if f.is_dir()
         ]
-
         dirs.sort(key=os.path.getctime)
-
-        if not os.path.exists(ckpt_path):
-            os.makedirs(ckpt_path)
 
         if len(dirs) >= ckpt_max:
             shutil.rmtree(dirs[0])

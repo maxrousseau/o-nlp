@@ -388,6 +388,7 @@ def setup_pretrain_t5(data_path, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     config.train_dataset = Dataset.load_from_disk(data_path).shuffle(seed=0)
     config.train_dataset = denoising_format(config.train_dataset)
+    # config.train_dataset = denoising_format(config.train_dataset.select(range(100)))
 
     logger.info("Masked tgt datasets loaded from file")
 
