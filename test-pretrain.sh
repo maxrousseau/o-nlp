@@ -22,7 +22,6 @@ python main.py \
  --runmode="pretrain" \
  --lora=False \
  --savedir="./test_path" \
- --checkpoint_state = "" \
  --load_from_checkpoint = True \
  --checkpoint_state="/datastores/tapp-datastore-2/tapp-t5-beta-200052-step2878/" \
  --checkpoint_step=2878 \
