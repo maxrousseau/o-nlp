@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 from transformers import get_scheduler, DataCollatorForSeq2Seq
 
 from accelerate import Accelerator
+from accelerate.utils import ProjectConfiguration
 
 import torch
 from torch.optim import AdamW
@@ -42,6 +43,10 @@ class BaseTrainer:
         self.test_batches = config.test_batches
 
         self.checkpoint_savedir = config.checkpoint_savedir
+
+        self.load_from_checkpoint = config.load_from_checkpoint
+        self.checkpoint_state = config.checkpoint_state
+        self.checkpoint_step = config.checkpoint_step
 
         self.max_seq_length = config.max_seq_length
         self.max_ans_length = config.max_ans_length
@@ -350,7 +355,8 @@ class PretrainT5(BaseTrainer):
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
-            accelerator = Accelerator()
+            pjcfg = ProjectConfiguration(total_limit=5)
+            accelerator = Accelerator(pjcfg)
             (
                 self.model,
                 optimizer,
@@ -369,6 +375,25 @@ class PretrainT5(BaseTrainer):
         save_threshold = 0
         losses = {"train": [], "val": []}
         n_step = 0
+
+        if self.load_from_checkpoint:
+            accelerator.load_state(self.checkpoint_state)
+            # @TODO get the number of masked tokens to the reloaded step...
+            for steps, batch in enumerate(self.train_dataloader):
+                if n_step <= self.checkpoint_step:
+                    flabels = batch["labels"].flatten().cpu()
+                    n_masked_tokens += len(flabels[flabels >= 0]) - 2
+                    n_step += 1
+                else:
+                    break
+            n_step = self.checkpoint_step
+            accelerator.skip_first_batches(self.train_dataloader, self.checkpoint_step)
+            logger.info(
+                "Checkpoint: {} reloaded! Step: {}, Number of masked tokens: {}".format(
+                    self.checkpoint_state, n_step, n_masked_tokens
+                )
+            )
+
         self.model.train()
         for epoch in range(self.num_epochs):
             for steps, batch in enumerate(self.train_dataloader):

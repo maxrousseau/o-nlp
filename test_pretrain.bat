@@ -3,8 +3,8 @@ python main.py^
  --lr=2e-5^
  --epochs=1^
  --lr_scheduler=False^
- --model_checkpoint="google/t5-v1_1-small"^
- --tokenizer_checkpoint="google/t5-v1_1-small"^
+ --model_checkpoint="google/t5-v1_1-base"^
+ --tokenizer_checkpoint="google/t5-v1_1-base"^
  --train_dataset="./etc/tgt-beta-0.85t-86k"^
  --max_seq_len=512^
  --max_ans_len=128^
@@ -12,3 +12,6 @@ python main.py^
  --runmode="pretrain"^
  --lora=False^
  --savedir="./test_path"^
+ --load_from_checkpoint=True^
+ --checkpoint_state="./tmp/tapp-datastore/tapp-t5-beta-200052-step2878/"^
+ --checkpoint_step=2878

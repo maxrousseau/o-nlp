@@ -32,6 +32,12 @@ flags.DEFINE_float("lr", 2e-5, "learning rate (AdamW optimizer)")
 flags.DEFINE_integer("epochs", 2, "number of training epochs")
 flags.DEFINE_bool("lr_scheduler", True, "use learning rate scheduler")
 
+flags.DEFINE_integer("checkpoint_step", None, "current step at last checkpoint save")
+flags.DEFINE_string(
+    "checkpoint_state", None, "path to the checkpoint directory to load from"
+)
+flags.DEFINE_bool("load_from_checkpoint", False, "load from a checkpoint?")
+
 
 flags.DEFINE_integer("max_seq_len", 384, "maximum length (tokens) of input sequence")
 flags.DEFINE_integer("max_ans_len", 128, "maximum length (tokens) of output sequence")
@@ -96,6 +102,9 @@ def main(argv):
             max_ans_length=FLAGS.max_ans_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
+            checkpoint_step=FLAGS.checkpoint_step,
+            checkpoint_state=FLAGS.checkpoint_state,
+            load_from_checkpoint=FLAGS.load_from_checkpoint,
         )
         config = t5_utils.setup_pretrain_t5(train_ds_path, config)
         pretrainer = PretrainT5(config)

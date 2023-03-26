@@ -50,6 +50,10 @@ class T5CFG:
     seed: str = 0
     lora: bool = False
 
+    load_from_checkpoint: bool = False
+    checkpoint_state: str = None
+    checkpoint_step: int = None
+
     train_dataset: Dataset = None
     test_dataset: Dataset = None
 
