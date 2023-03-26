@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 
 import numpy as np
 import random
@@ -312,6 +313,27 @@ class PretrainT5(BaseTrainer):
         logger.info("Training, validation dataloaders created")
         # shuffle only train...
 
+    def __save_checkpoint(self, accelerator, n_masked_tokens, n_step):
+        ckpt_path = "./ckpts/"
+        ckpt_max = 5
+        dirs = [
+            os.path.relpath(ckpt_path + f.name)
+            for f in os.scandir(ckpt_path)
+            if f.is_dir()
+        ]
+
+        dirs.sort(key=os.path.getctime)
+
+        if not os.path.exists(ckpt_path):
+            os.makedirs(ckpt_path)
+
+        if len(dirs) >= ckpt_max:
+            shutil.rmtree(dirs[0])
+
+        accelerator.save_state(
+            "./ckpts/{}-{}mt-{}s".format(self.name, n_masked_tokens, n_step)
+        )
+
     @torch.no_grad()
     def __eval(self, losses):
         self.model.eval()
@@ -355,8 +377,7 @@ class PretrainT5(BaseTrainer):
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
-            pjcfg = ProjectConfiguration(total_limit=5)
-            accelerator = Accelerator(pjcfg)
+            accelerator = Accelerator()
             (
                 self.model,
                 optimizer,
@@ -424,13 +445,11 @@ class PretrainT5(BaseTrainer):
                 progressbar.update(1)
 
                 if (
-                    int(n_masked_tokens / 20000) > save_threshold
+                    int(n_masked_tokens / 1) > save_threshold
                 ):  # save initial checkpoint then each 1k masked tokens
                     # (ckpt_num * 1000)
                     save_threshold = int(n_masked_tokens / 20000)
-                    accelerator.save_state(
-                        "./ckpts/{}-{}".format(self.name, n_masked_tokens)
-                    )
+                    self.__save_checkpoint(accelerator, n_masked_tokens, n_step)
                     logger.info(
                         "chekpoint saved at step {} after {} masked tokens".format(
                             n_step, n_masked_tokens
