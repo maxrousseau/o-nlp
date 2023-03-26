@@ -378,7 +378,7 @@ class PretrainT5(BaseTrainer):
 
         if self.load_from_checkpoint:
             accelerator.load_state(self.checkpoint_state)
-            # @TODO get the number of masked tokens to the reloaded step...
+            # get the number of masked tokens to the reloaded step...
             for steps, batch in enumerate(self.train_dataloader):
                 if n_step <= self.checkpoint_step:
                     flabels = batch["labels"].flatten().cpu()
