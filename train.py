@@ -416,6 +416,8 @@ class PretrainT5(BaseTrainer):
                 )
             )
 
+        # @TODO :: eval here before we start training then only eval every 100k masked tokens otherwise it is probably
+        # going to take too long to train (right now over 8hours for 86k samples)
         self.model.train()
         for epoch in range(self.num_epochs):
             for steps, batch in enumerate(self.train_dataloader):
@@ -458,8 +460,9 @@ class PretrainT5(BaseTrainer):
                     )
                     losses = self.__eval(losses)
 
-                    # @TODO :: get mean training and val losses, reset the losses arrays, log n_masked_tokens, step and
-                    # more
+                    # @TODO :: save best model according to lowest validation loss!
+
+                    # get mean training and val losses, reset the losses arrays, log n_masked_tokens, step and more
                     wandb.log(
                         {
                             "val_loss": np.array(losses["val"]).mean(),
