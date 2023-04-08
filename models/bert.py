@@ -91,7 +91,7 @@ class OrthoBert:
         self.metric = load_metric("squad")
 
     def __seed_worker(worker_id):
-        worker_seed = torch.initial_seed() % 2**32
+        worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
@@ -216,7 +216,7 @@ class OrthoBert:
         check out the output
         """
         n_best = 20
-        max_answer_length = 30
+        max_answer_length = 50
 
         example_to_features = collections.defaultdict(list)
         for idx, feature in enumerate(features):

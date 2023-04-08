@@ -5,3 +5,5 @@ fops/
 *.csv
 tmp/
 wandb/
+ckpts/
+targets-cosine/

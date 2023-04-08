@@ -246,8 +246,6 @@ def t5_format_mi(dataset):
 def load_corpus(corpus_path):
     """ """
     corpus = []  # just a list of strings, each string is a page from an article
-    corpus_keys = []  # list of dicts correstponding to the passage above
-    # {article_id : "", page: 0}
 
     with open(corpus_path, "rb") as f:
         raw_corpus = json.load(f)
@@ -256,11 +254,10 @@ def load_corpus(corpus_path):
             page = 1
 
             for c in p["content"]:
-                corpus.append(c)
-                corpus_keys.append({"article_id": key, "page": page})
+                corpus.append({"article_id": key, "page": page, "text": c})
                 page += 1
 
-    return (corpus, corpus_keys)
+    return corpus
 
 
 def load_squad_mi(n=None, set=None):
