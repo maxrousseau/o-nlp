@@ -18,16 +18,6 @@ import requests
 import numpy as np
 
 
-# only works if answer is a single sentence
-def getAnswerSentence(context, answer):
-    slist = sent_tokenize(context)
-    for s in slist:
-        if answer in s:
-            return s
-        else:
-            None
-
-
 def find_topk_ngrams(sentences, n, k):
     """extract recurring top K n-grams from a list of sentences"""
     sentences = " ".join(sentences)
