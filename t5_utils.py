@@ -16,7 +16,7 @@ from transformers import (
     T5Tokenizer,
 )
 
-from load_data import load_mini_oqa, formatT5MI
+from load_data import load_mini_oqa, formatT5MI, formatUL2MI
 
 from datasets import Dataset, load_metric
 import datasets
@@ -294,8 +294,10 @@ def setup_prelim_finetune_t5(train_path, test_path, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     oqa_dataset = load_mini_oqa(train_path, test_path)
 
-    config.train_dataset = Dataset.from_dict(formatT5MI(oqa_dataset[2]))
-    config.test_dataset = Dataset.from_dict(formatT5MI(oqa_dataset[3]))
+    config.train_dataset = Dataset.from_dict(
+        formatUL2MI(oqa_dataset[2])
+    )  # set to UL2 or T5 depending on model used
+    config.test_dataset = Dataset.from_dict(formatUL2MI(oqa_dataset[3]))
     logger.info("Masked QA datasets loaded from file")
 
     config.model, config.tokenizer = t5_init(

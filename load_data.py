@@ -163,6 +163,39 @@ def formatT5MI(dataset):
     }
 
 
+def formatUL2MI(dataset):
+    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
+    "[NLG] Question: a question? Answer: <mask>. Context: this is the context"
+
+    USAGE:
+        train_raw = Dataset.from_dict(formatToMI(dset[2]))
+        test_raw = Dataset.from_dict(formatToMI(dset[3]))
+
+        # then you can feed those to the FsBART model class at initialization to run
+
+    """
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    questions = pa.array(dataset["question"])
+    answers = pa.array([i["text"][0] for i in dataset["answers"]])
+
+    # for X denoising with UL2 we prefix inputs with [NLG] the rest should be identical
+    masked_strings = pa.compute.binary_join_element_wise(
+        "[NLG] Question: ", questions, " Answer: <extra_id_0> Context: ", contexts, ""
+    )
+    # Important not to include the "." character at the end of the answer otherwise the model generates double dots
+
+    target_answers = pa.compute.binary_join_element_wise("<extra_id_0> ", answers, "")
+
+    gc.enable()
+
+    return {
+        "masked_strings": masked_strings.to_pylist(),
+        "answer_strings": target_answers.to_pylist(),
+        "id": dataset["id"],
+    }
+
+
 # @TODO -- determine if more elaborate function needed...
 def loadOQAforRetrieval(path):
     """ """
