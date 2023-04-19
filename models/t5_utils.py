@@ -15,6 +15,8 @@ from transformers import (
     T5ForConditionalGeneration,
     T5Tokenizer,
 )
+
+# @BUG deprecate PEFT stuff, only fine-tune
 from peft import LoraConfig, get_peft_model, TaskType
 
 from load_data import load_mini_oqa, t5_format_mi, denoising_format, load_tgt

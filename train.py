@@ -20,6 +20,12 @@ from torch.utils.data import DataLoader
 
 import wandb
 
+# @TODO
+class BaseTester:
+    """ """
+
+    None
+
 
 class BaseTrainer:
     FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
@@ -477,3 +483,15 @@ class PretrainT5(BaseTrainer):
         self.model.save_pretrained(local_path)
 
         return None
+
+
+class FinetuneBERT(BaseTrainer):
+    """ """
+
+
+class FinetuneBART(BaseTrainer):
+    """ """
+
+
+class PretrainBART(BaseTrainer):
+    """ """

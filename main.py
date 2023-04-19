@@ -89,6 +89,21 @@ def main(argv):
         tuner = FineTuneT5(config)
         tuner()
 
+    elif runmode == "bert-finetune":
+        config = bert_utils.BERTCFG(
+            name = FLAGS.name
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_seq_length=FLAGS.max_seq_len,
+            max_ans_length=FLAGS.max_ans_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+
     elif runmode == "pretrain":
         config = t5_utils.T5CFG(
             name=FLAGS.name,
