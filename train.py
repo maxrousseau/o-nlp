@@ -5,7 +5,7 @@ import shutil
 import numpy as np
 import random
 
-from t5_utils import *
+from models import t5_utils, bert_utils
 
 from tqdm.auto import tqdm
 
@@ -487,6 +487,25 @@ class PretrainT5(BaseTrainer):
 
 class FinetuneBERT(BaseTrainer):
     """ """
+
+    @torch.nograd()
+    def __eval():
+        """ """
+        return None
+
+    def __call__():
+
+        # dataloaders
+
+        # accelerator
+
+        # checkpointing
+
+        # training loop
+
+        # eval
+
+        return None
 
 
 class FinetuneBART(BaseTrainer):

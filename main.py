@@ -2,7 +2,8 @@
 import os
 import logging
 
-import t5_utils
+from models import t5_utils
+from models import bert_utils
 from train import FineTuneT5, PretrainT5
 
 
@@ -25,9 +26,7 @@ runmode = [
 flags.DEFINE_string(
     "name", None, "model name for saving checkpoints and tracking loss w/ wandb"
 )
-flags.DEFINE_enum(
-    "runmode", None, ["finetune", "pretrain"], "type of training to run model-type"
-)
+flags.DEFINE_enum("runmode", None, runmode, "type of training to run model-type")
 flags.DEFINE_float("lr", 2e-5, "learning rate (AdamW optimizer)")
 flags.DEFINE_integer("epochs", 2, "number of training epochs")
 flags.DEFINE_bool("lr_scheduler", True, "use learning rate scheduler")
@@ -47,6 +46,7 @@ flags.DEFINE_integer("seed", 0, "random seed")
 
 
 flags.DEFINE_string("train_dataset", None, "training dataset")
+flags.DEFINE_string("val_dataset", None, "validation dataset")
 flags.DEFINE_string("test_dataset", None, "test/evaluation dataset")
 
 
@@ -66,11 +66,12 @@ def main(argv):
     """get args and call"""
 
     train_ds_path = FLAGS.train_dataset
+    val_ds_path = FLAGS.val_dataset
     test_ds_path = FLAGS.test_dataset
 
     runmode = FLAGS.runmode
 
-    if runmode == "finetune":
+    if runmode == "t5-finetune":
         config = t5_utils.T5CFG(
             name=FLAGS.name,
             lr=FLAGS.lr,
@@ -91,18 +92,18 @@ def main(argv):
 
     elif runmode == "bert-finetune":
         config = bert_utils.BERTCFG(
-            name = FLAGS.name
+            name=FLAGS.name,
             lr=FLAGS.lr,
             lr_scheduler=FLAGS.lr_scheduler,
             n_epochs=FLAGS.epochs,
             model_checkpoint=FLAGS.model_checkpoint,
             tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
             checkpoint_savedir=FLAGS.savedir,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
+            max_length=FLAGS.max_seq_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
         )
+        config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
 
     elif runmode == "pretrain":
         config = t5_utils.T5CFG(

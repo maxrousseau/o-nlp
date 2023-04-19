@@ -11,16 +11,22 @@ def load_from_json(fpath):
     c = [x.get("context") for x in raw]
     t = [x.get("topic") for x in raw]
     q = [x.get("question") for x in raw]
-    a = [x.get("answer") for x in raw]
     s = [x.get("answer_sentences") for x in raw]
     m = [x.get("meta") for x in raw]
     uuid = [x.get("uuid") for x in raw]
+
+    answer = [x.get("answer") for x in raw]
+
+    answers = []
+
+    for i in range(len(answer)):
+        answers.append({"answer_start": [c[i].find(answer[i])], "text": [answer[i]]})
 
     return Dataset.from_dict(
         {
             "question": q,
             "context": c,
-            "answer": a,
+            "answers": answers,
             "answer_sentence": s,
             "topic": t,
             "reference": m,

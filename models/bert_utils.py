@@ -17,7 +17,12 @@ from transformers import (
     AutoModelForQuestionAnswering,
 )
 
-from datasets import Dataset, load_metric
+import datasets
+from datasets import Dataset
+
+from evaluate import load
+
+metric = load("squad")
 
 datasets.utils.logging.set_verbosity_warning
 
@@ -32,7 +37,7 @@ class BERTCFG:
     name: str = "bert-default"
     lr: float = 2e-5
     n_epochs: int = 12
-    lr_scheduler: bool = True
+    lr_scheduler: bool = False
     model_checkpoint: str = ""
     tokenizer_checkpoint: str = ""
     checkpoint_savedir: str = "./bert-ckpt"
@@ -82,9 +87,9 @@ def preprocess_training(
     inputs = tokenizer(
         questions,
         examples["context"],
-        max_length=self.max_length,
+        max_length=max_len,
         truncation="only_second",
-        stride=self.stride,
+        stride=stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
         padding="max_length",
@@ -137,7 +142,7 @@ def preprocess_training(
 
 
 def preprocess_validation(
-    examples, tokenizer, padding="max_length", stride=128, max_length=128
+    examples, tokenizer, padding="max_length", stride=128, max_len=128
 ):
     """preprocessing for evalutation samples (validation and test)
     return:
@@ -148,7 +153,7 @@ def preprocess_validation(
     inputs = tokenizer(
         questions,
         examples["context"],
-        max_length=max_length,  # what is this for?
+        max_length=max_len,  # what is this for?
         truncation="only_second",
         stride=stride,
         return_overflowing_tokens=True,
@@ -227,6 +232,7 @@ def answer_from_logits(start_logits, end_logits, features, examples, tokenizer, 
         else:
             predicted_answers.append({"id": example_id, "prediction_text": ""})
 
+    # @TODO ::  make sure this all works even when we don't have the answers
     theoretical_answers = [
         {"id": ex["id"], "answers": ex["answers"]} for ex in examples
     ]
@@ -249,7 +255,7 @@ def prepare_inputs(
                 example, tokenizer, padding=padding, max_len=max_len, stride=stride
             ),
             batched=True,
-            remove_columns=examples.column_names,
+            remove_columns=dataset.column_names,
         )
         logger.info(
             "Training dataset processed and tokenized : n = {}".format(
@@ -262,7 +268,7 @@ def prepare_inputs(
                 example, tokenizer, padding=padding, max_len=max_len, stride=stride
             ),
             batched=True,
-            remove_columns=examples.column_names,
+            remove_columns=dataset.column_names,
         )
         logger.info(
             "Test dataset processed and tokenized : n = {}".format(
@@ -271,7 +277,7 @@ def prepare_inputs(
         )
 
     else:
-        Exception("Specify subset for data preparation")
+        raise Exception("Specify subset for data preparation")
 
 
 def setup_finetuning_oqa(train_path, val_path, config):
@@ -307,10 +313,8 @@ def setup_finetuning_oqa(train_path, val_path, config):
         stride=config.stride,
         max_len=config.max_length,
         padding=config.padding,
-        subset="test",
+        subset="eval",
     )
-
-    # @HERE :: before moving to the fine-tuning code test out that at least the initialization is working
 
     return config
 

@@ -1,0 +1,13 @@
+python main.py^
+ --name="bert-test"^
+ --lr=2e-5^
+ --epochs=1^
+ --lr_scheduler=True^
+ --model_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
+ --tokenizer_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
+ --train_dataset="./tmp/bin/train"^
+ --val_dataset="./tmp/bin/val"^
+ --max_seq_len=512^
+ --seed=0^
+ --runmode="bert-finetune"^
+ --savedir="./test_path"^
