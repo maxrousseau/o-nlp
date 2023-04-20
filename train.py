@@ -511,10 +511,14 @@ class FinetuneBERT(BaseTrainer):
 
         start_logits = np.concatenate(start_logits)
         end_logits = np.concatenate(end_logits)
-        start_logits = start_logits[: len(self.proc_test_dataset)]
-        end_logits = end_logits[: len(self.proc_test_dataset)]
+        start_logits = start_logits[: len(self.val_batches)]
+        end_logits = end_logits[: len(self.val_batches)]
         metrics, unused, unused = bert_utils.answer_from_logits(
-            start_logits, end_logits, self.val_batches, self.val_dataset
+            start_logits,
+            end_logits,
+            self.val_batches,
+            self.val_dataset,
+            self.tokenizer,
         )
         f1_score = metrics["f1"]
         accelerator.wait_for_everyone()
@@ -530,7 +534,7 @@ class FinetuneBERT(BaseTrainer):
             collate_fn=default_data_collator,
             batch_size=8,
             num_workers=0,
-            worker_init_fn=self.seed_worker(),
+            worker_init_fn=self.seed_worker,
             generator=self.g,
         )
 
@@ -609,7 +613,7 @@ class FinetuneBERT(BaseTrainer):
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 accelerator.backward(loss)
-                losses["train"].append(loss)
+                losses["train"].append(loss.detach().numpy())
 
                 optimizer.step()
                 lr_scheduler.step()

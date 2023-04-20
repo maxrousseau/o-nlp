@@ -184,12 +184,13 @@ def preprocess_validation(
     return inputs
 
 
-def answer_from_logits(start_logits, end_logits, features, examples, tokenizer, metric):
+def answer_from_logits(start_logits, end_logits, features, examples, tokenizer):
     """
     from the HF tutorial, this function takes the logits as input and returns the score from the metric (EM and F1)
     @TODO - separate the best answer code from the metric computation -- keeping them in separate functions would make it easier to
     check out the output
     """
+    metric = load("squad")
     n_best = 20
     max_answer_length = 50
 
