@@ -379,7 +379,7 @@ class OrthoBert:
             self.model.eval()
             start_logits = []
             end_logits = []
-            print("Evaluation")  # use accelarator.print() if you only want to
+            # print("Evaluation")  # use accelarator.print() if you only want to
             # print once when training on multiple machines
 
             for batch in tqdm(self.test_dataloader):

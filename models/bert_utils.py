@@ -7,6 +7,11 @@ import os
 import logging
 from dataclasses import dataclass
 from typing import Any
+import collections
+
+import numpy as np
+
+from tqdm.auto import tqdm
 
 import torch
 from torch.optim import AdamW
@@ -262,6 +267,7 @@ def prepare_inputs(
                 len(tokenized_dataset)
             )
         )
+        return tokenized_dataset
     elif subset == "eval":
         tokenized_dataset = dataset.map(
             lambda example: preprocess_validation(
@@ -275,6 +281,7 @@ def prepare_inputs(
                 len(tokenized_dataset)
             )
         )
+        return tokenized_dataset
 
     else:
         raise Exception("Specify subset for data preparation")

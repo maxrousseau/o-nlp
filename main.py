@@ -4,7 +4,7 @@ import logging
 
 from models import t5_utils
 from models import bert_utils
-from train import FineTuneT5, PretrainT5
+from train import *
 
 
 from absl import app
@@ -104,6 +104,9 @@ def main(argv):
             runmode=FLAGS.runmode,
         )
         config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
+
+        tuner = FinetuneBERT(config)
+        tuner()
 
     elif runmode == "pretrain":
         config = t5_utils.T5CFG(
