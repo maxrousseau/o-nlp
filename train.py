@@ -23,19 +23,30 @@ from datasets import Dataset
 
 import wandb
 
+
 # @TODO
 class BaseTester:
-    """ """
+    """Tester base class, inference only"""
 
-    None
+    def __init__(self, config):  # @fix...
+        """basic trainer class for all models"""
+        self.name = config.name
+
+        self.tokenizer = config.tokenizer
+        self.model = config.model
+
+        self.test_dataset = config.test_dataset
+
+        self.test_batches = config.test_batches
+
+        self.padding = config.padding
+        self.stride = config.stride
+
+        # defined locally
+        self.test_dataloader = None
 
 
 class BaseTrainer:
-    FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
-    logging.basicConfig(format=FORMAT)
-    logger = logging.getLogger("trainer")
-    logger.setLevel(logging.DEBUG)  # change level if debug or not
-
     def __init__(self, config):  # @fix...
         """basic trainer class for all models"""
         self.name = config.name
@@ -75,6 +86,11 @@ class BaseTrainer:
         torch.backends.cudnn.benchmark = False
         self.g = torch.Generator()
         self.g.manual_seed(self.seed)
+
+        FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
+        logging.basicConfig(format=FORMAT)
+        self.logger = logging.getLogger("trainer")
+        self.logger.setLevel(logging.DEBUG)  # change level if debug or not
 
         # defined locally
         self.train_dataloader = None
@@ -466,7 +482,7 @@ class PretrainT5(BaseTrainer):
                     # (ckpt_num * 1000)
                     save_threshold = int(n_masked_tokens / 20000)
                     self.__save_checkpoint(accelerator, n_masked_tokens, n_step)
-                    logger.info(
+                    self.logger.info(
                         "chekpoint saved at step {} after {} masked tokens".format(
                             n_step, n_masked_tokens
                         )
@@ -641,4 +657,84 @@ class FinetuneBART(BaseTrainer):
 
 
 class PretrainBART(BaseTrainer):
+    """ """
+
+
+class EvaluateBERT(BaseTester):
+    """Evaluate model and print results to stdout and export as a log/txt file artifact"""
+
+    def __init__(self, config):
+        super().__init__(config)
+
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
+        # create logger with 'spam_application'
+        self.logger = logging.getLogger("eval_logger")
+        self.logger.setLevel(logging.DEBUG)
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+
+    def __get_dataloader(self):
+        test_tensor = self.test_batches.remove_columns(["example_id", "offset_mapping"])
+        test_tensor.set_format("torch")
+        self.test_dataloader = DataLoader(
+            test_tensor,
+            collate_fn=default_data_collator,
+            batch_size=4,
+            shuffle=False,
+        )
+
+        self.logger.info("Test dataloader created")
+
+    @torch.no_grad()
+    def __call__(self):
+        # dataloader for test
+        self.__get_dataloader()
+
+        # run inference on batch
+        accelerator = Accelerator()
+        (
+            self.model,
+            self.test_dataloader,
+        ) = accelerator.prepare(self.model, self.test_dataloader)
+
+        # eval
+        start_logits = []
+        end_logits = []
+
+        self.model.eval()
+
+        for batch in tqdm(self.test_dataloader):
+            outputs = self.model(**batch)
+            start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
+            end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
+
+        start_logits = np.concatenate(start_logits)
+        end_logits = np.concatenate(end_logits)
+        start_logits = start_logits[: len(self.test_batches)]
+        end_logits = end_logits[: len(self.test_batches)]
+        metrics, unused, unused = bert_utils.answer_from_logits(
+            start_logits,
+            end_logits,
+            self.test_batches,
+            self.test_dataset,
+            self.tokenizer,
+        )
+        f1_score = metrics["f1"]
+        em = metrics["exact_match"]
+
+        self.logger.info(
+            "\n{} \nEvaluation results \nmodel : {} \n > F1 = {} \n > EM = {} \n{}".format(
+                "*" * 50, self.name, f1_score, em, "*" * 50
+            )
+        )
+
+
+class EvaluateBART(BaseTester):
+    """ """
+
+
+class EvaluateT5(BaseTester):
     """ """

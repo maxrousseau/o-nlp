@@ -327,6 +327,25 @@ def setup_finetuning_oqa(train_path, val_path, config):
     return config
 
 
-def setup_test_oqa(test_path, config):
+def setup_evaluate_oqa(test_path, config):
     """ """
-    return None
+    config.test_dataset = Dataset.load_from_disk(test_path)
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    logger.info("model and tokenizer initialized")
+
+    config.test_batches = prepare_inputs(
+        config.test_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config

@@ -20,7 +20,7 @@ runmode = [
     "bart-finetune",
     "bart-pretrain",
     "bert-finetune",
-    "bert-pretrain",
+    "bert-evaluate",
 ]
 
 flags.DEFINE_string(
@@ -107,6 +107,20 @@ def main(argv):
 
         tuner = FinetuneBERT(config)
         tuner()
+
+    elif runmode == "bert-evaluate":
+        config = bert_utils.BERTCFG(
+            name=FLAGS.name,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bert_utils.setup_evaluate_oqa(test_ds_path, config)
+
+        evaluater = EvaluateBERT(config)
+        evaluater()
 
     elif runmode == "pretrain":
         config = t5_utils.T5CFG(
