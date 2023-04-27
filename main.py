@@ -2,8 +2,8 @@
 import os
 import logging
 
-from models import t5_utils
-from models import bert_utils
+from models import t5_utils, bert_utils, bart_utils
+
 from train import *
 
 
@@ -84,11 +84,32 @@ def main(argv):
             max_ans_length=FLAGS.max_ans_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
-            lora=FLAGS.lora,
         )
         config = t5_utils.setup_finetune_t5(train_ds_path, test_ds_path, config)
         tuner = FineTuneT5(config)
         tuner()
+
+    elif runmode == "bart-finetune":
+        config = bart_utils.BARTCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_seq_length=FLAGS.max_seq_len,
+            max_ans_length=FLAGS.max_ans_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bart_utils.setup_finetune_bart(train_ds_path, val_ds_path, config)
+        # @HERE :: make sure setup function is good, then finish training loop
+        tuner = FinetuneBART(config)
+        tuner()
+
+    elif runmode == "bart-evaluate":
+        None
 
     elif runmode == "bert-finetune":
         config = bert_utils.BERTCFG(

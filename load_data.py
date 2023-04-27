@@ -176,40 +176,6 @@ def denoising_format(dataset):
     )
 
 
-def bart_format_mi(dataset):
-    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
-    "Question: a question? Answer: <mask>. Context: this is the context"
-    USAGE:
-        train_raw = Dataset.from_dict(formatToMI(dset[2]))
-        test_raw = Dataset.from_dict(formatToMI(dset[3]))
-        # then you can feed those to the FsBART model class at initialization to run
-    """
-    gc.disable()
-    contexts = pa.array(dataset["context"])
-    questions = pa.array(dataset["question"])
-    answers = pa.array([i["text"][0] for i in dataset["answers"]])
-
-    masked_strings = pa.compute.binary_join_element_wise(
-        "Question: ", questions, " Answer: <mask>. Context: ", contexts, ""
-    )
-    full_strings = pa.compute.binary_join_element_wise(
-        "Question: ", questions, " Answer: ", answers, ". Context: ", contexts, ""
-    )
-    qa_strings = pa.compute.binary_join_element_wise(
-        "Question: ", questions, " Answer: ", answers, ".", ""
-    )
-
-    gc.enable()
-
-    return {
-        "masked_strings": masked_strings.to_pylist(),
-        "full_strings": full_strings.to_pylist(),
-        "qa_strings": qa_strings.to_pylist(),
-        "answer_strings": answers.to_pylist(),
-        "id": dataset["id"],
-    }
-
-
 def t5_format_mi(dataset):
     """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
     "Question: a question? Answer: <mask>. Context: this is the context"

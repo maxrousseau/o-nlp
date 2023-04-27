@@ -6,7 +6,7 @@ from datetime import datetime
 import numpy as np
 import random
 
-from models import t5_utils, bert_utils
+from models import t5_utils, bert_utils, bart_utils
 
 from tqdm.auto import tqdm
 
@@ -101,6 +101,12 @@ class BaseTrainer:
         worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
+
+    def save_model(self, path):
+        """basic model saving where the path is overwrote if"""
+        if os.path.isfile(path):
+            shutil.rmtree(path)
+        self.model.save_pretrained(path)
 
 
 class FineTuneT5(BaseTrainer):
@@ -565,17 +571,11 @@ class FinetuneBERT(BaseTrainer):
 
         self.logger.info("Training and validation dataloaders created")
 
-    def __save_model(self, path):
-        """basic model saving where the path is overwrote if"""
-        if os.path.isfile(path):
-            shutil.rmtree(path)
-        self.model.save_pretrained(path)
-
     def __call__(self):
 
         # dataloaders
         self.__get_dataloaders()
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
             "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
@@ -643,7 +643,7 @@ class FinetuneBERT(BaseTrainer):
 
             # checkpointing (only best_val)
             if f1_score > best_f1:
-                self.__save_model(save_path)
+                self.save_model(save_path)
                 best_f1 = f1_score
                 self.logger.info("New save with f1 = {}".format(best_f1))
 
@@ -653,7 +653,139 @@ class FinetuneBERT(BaseTrainer):
 
 
 class FinetuneBART(BaseTrainer):
-    """ """
+    """>>> tuner = FinetuneBART(config)
+    desired output"""
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_ans_length = config.max_ans_length
+        self.max_seq_length = config.max_seq_length
+
+    def __get_dataloaders(self):
+        train_tensor = self.train_batches.remove_columns(["example_id"])
+        train_tensor.set_format("torch")
+
+        label_pad_token_id = -100
+        data_collator = DataCollatorForSeq2Seq(
+            self.tokenizer,
+            model=self.model,
+            label_pad_token_id=label_pad_token_id,
+            pad_to_multiple_of=8,
+        )
+
+        self.train_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=data_collator,
+            batch_size=8,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
+        val_tensor = self.val_batches.remove_columns(["example_id"])
+        val_tensor.set_format("torch")
+        self.val_dataloader = DataLoader(
+            val_tensor,
+            collate_fn=data_collator,
+            batch_size=4,
+            shuffle=False,
+        )
+
+        self.logger.info("Training and validation dataloaders created")
+
+    @torch.no_grad()
+    def __eval(self, accelerator):
+        """ """
+        self.model.eval()
+        answer_batches = []
+        for batch in tqdm(self.val_dataloader):
+            outputs = self.model.generate(
+                **batch, max_length=self.max_ans_length, num_beams=1
+            )
+            for i in outputs:
+                answer_batches.append(i)
+
+        predicted_answers = [
+            bart_utils.clean_outputs(i, tokenizer=self.tokenizer)
+            for i in answer_batches
+        ]
+        eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
+
+        score, predictions, targets = bart_utils.evaluate(
+            eval_outputs, self.val_dataset
+        )
+        f1_score = score["f1"]
+
+        return f1_score
+
+    def __call__(self):
+        self.__get_dataloaders()
+
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        save_path = os.path.abspath(
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
+
+        best_f1 = -1
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+
+        # accelerator
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=100,
+                num_training_steps=num_training_steps,
+            )
+
+        if torch.device != "cpu":
+            accelerator = Accelerator(mixed_precision="fp16")
+            (
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                self.val_dataloader,
+            ) = accelerator.prepare(
+                self.model, optimizer, self.train_dataloader, self.val_dataloader
+            )
+            if self.lr_scheduler:
+                accelerator.register_for_checkpointing(lr_scheduler)
+
+        losses = {"train": []}
+
+        # training loop
+        progressbar = tqdm(range(num_training_steps))
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            for steps, batch in enumerate(self.train_dataloader):
+                outputs = self.model(**batch)
+                loss = outputs.loss
+                accelerator.backward(loss)
+                losses["train"].append(loss.detach().numpy())
+
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
+
+            # eval
+            f1_score = self.__eval(accelerator)
+            self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
+            # wandb.log({"f1": f1_score, "train_loss": np.array(losses["train"]).mean()})
+
+            # checkpointing (only best_val)
+            if f1_score > best_f1:
+                self.save_model(save_path)
+                best_f1 = f1_score
+                self.logger.info("New save with f1 = {}".format(best_f1))
+
+        self.logger.info(
+            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
+        )
+        # @HERE :: debug then setup wandb logging
 
 
 class PretrainBART(BaseTrainer):

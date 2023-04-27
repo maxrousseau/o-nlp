@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 import collections
+import gc
 
 import torch
 from torch.optim import AdamW
@@ -16,16 +17,25 @@ from torch.utils.data import DataLoader
 from transformers import (
     get_scheduler,
     DataCollatorForSeq2Seq,
+    BartTokenizerFast,
+    BartForConditionalGeneration,
 )
 
 from datasets import Dataset
 import datasets
 
-from evaluate import load
+import pyarrow as pa
 
-metric = load("squad")
+import evaluate
+
+metric = evaluate.load("squad")
 
 datasets.utils.logging.set_verbosity_warning
+
+FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger("bart-utils")
+logger.setLevel(logging.DEBUG)  # change level if debug or not
 
 
 @dataclass
@@ -63,28 +73,237 @@ class BARTCFG:
     # def __repr__() -> str
 
 
-def bart_init():
+def bart_init(model_checkpoint, tokenizer_checkpoint):
     """ """
-    None
+    model = BartForConditionalGeneration.from_pretrained(model_checkpoint)
+    tokenizer = BartTokenizerFast.from_pretrained(tokenizer_checkpoint)
+
+    return model, tokenizer
 
 
-def preprocess_training():
+def bart_format_mi(dataset):
+    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
+    "Question: a question? Answer: <mask>. Context: this is the context"
+    USAGE:
+        train_raw = Dataset.from_dict(formatToMI(dset[2]))
+        test_raw = Dataset.from_dict(formatToMI(dset[3]))
+        # then you can feed those to the FsBART model class at initialization to run
+    """
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    questions = pa.array(dataset["question"])
+    answers = pa.array([i["text"][0] for i in dataset["answers"]])
+
+    masked_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: <mask>. Context: ", contexts, ""
+    )
+    full_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ". Context: ", contexts, ""
+    )
+    qa_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: ", answers, ".", ""
+    )
+
+    gc.enable()
+
+    return Dataset.from_dict(
+        {
+            "masked_strings": masked_strings.to_pylist(),
+            "full_strings": full_strings.to_pylist(),
+            "qa_strings": qa_strings.to_pylist(),
+            "answer_strings": answers.to_pylist(),
+            "id": dataset["id"],
+        }
+    )
+
+
+def preprocess_training(
+    examples, tokenizer=None, padding="max_length", max_seq_length=512
+):
     """ """
-    None
+    source, target = examples["masked_strings"], examples["qa_strings"]
+    source_tokenized = tokenizer(
+        source,
+        padding=padding,
+        max_length=max_seq_length,
+        truncation=True,
+    )
+
+    batch = {k: v for k, v in source_tokenized.items()}
+
+    target_tokenized = tokenizer(
+        target,
+        padding=padding,
+        max_length=max_seq_length,
+        truncation=True,
+    )
+
+    # Ignore padding in the loss
+    batch["labels"] = [
+        [-100 if token == tokenizer.pad_token_id else token for token in l]
+        for l in target_tokenized["input_ids"]
+    ]
+
+    batch["example_id"] = examples["id"]
+
+    return batch
 
 
-def preprocess_validation():
+def preprocess_validation(
+    examples, tokenizer=None, padding="max_length", max_seq_length=128
+):
     """ """
-    None
+    source = examples["masked_strings"]
+    source_tokenized = tokenizer(
+        source,
+        padding=padding,
+        max_length=max_seq_length,
+        truncation=True,
+    )
+
+    batch = {k: v for k, v in source_tokenized.items()}
+
+    batch["example_id"] = examples["id"]
+
+    return batch
 
 
-def clean_outputs():
-    None
+def clean_outputs(output_ids, tokenizer=None):
+    """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
+    out = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+    try:
+        answer_start = out.find("Answer: ") + 8
+        answer_end = out.find("Context")
+        answer = out[answer_start:answer_end]
+    except:
+        answer = ""
+
+    return answer
 
 
-def prepare_inputs():
-    None
+def prepare_inputs(
+    dataset,
+    tokenizer=None,
+    subset=None,
+    padding="max_length",
+    max_seq_length=512,
+):
+    if subset == "train":
+        # do this
+        tokenized_dataset = dataset.map(
+            lambda example: preprocess_training(
+                example,
+                tokenizer=tokenizer,
+                padding=padding,
+                max_seq_length=max_seq_length,
+            ),
+            batched=True,
+            remove_columns=dataset.column_names,
+        )
+        logger.info(
+            "Training dataset processed and tokenized : n = {}".format(
+                len(tokenized_dataset)
+            )
+        )
+    elif subset == "eval":
+        tokenized_dataset = dataset.map(
+            lambda example: preprocess_validation(
+                example,
+                tokenizer=tokenizer,
+                padding=padding,
+                max_seq_length=max_seq_length,
+            ),
+            batched=True,
+            remove_columns=dataset.column_names,
+        )
+        logger.info(
+            "Validation/evaluation dataset processed and tokenized : n = {}".format(
+                len(tokenized_dataset)
+            )
+        )
+
+    else:
+        raise Exception("Specify subset for data preparation")
+
+    return tokenized_dataset
 
 
-def evaluate():
-    None
+def evaluate(eval_outputs, answers):
+    theoretical_answers = []
+    predicted_answers = []
+    datasets.disable_progress_bar()
+
+    for idx, predicted_answer in eval_outputs:
+        label_answer = answers.filter(lambda sample: sample["id"] == idx)[
+            "answer_strings"
+        ]
+
+        theoretical_answers.append(
+            {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
+        )
+
+        predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
+
+    m = metric.compute(predictions=predicted_answers, references=theoretical_answers)
+
+    return m, predicted_answers, theoretical_answers
+
+
+def setup_finetune_bart(train_path, val_path, config):
+    """"""
+    config.train_dataset = bart_format_mi(
+        Dataset.load_from_disk(train_path).select(range(4))
+    )
+    config.val_dataset = bart_format_mi(
+        Dataset.load_from_disk(val_path).select(range(4))
+    )
+
+    logger.info("Training and validation datasets loaded from disk")
+
+    config.model, config.tokenizer = bart_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    logger.info("Model and tokenizer initialized")
+
+    config.train_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        max_seq_length=config.max_seq_length,
+        padding=config.padding,
+        subset="train",
+    )
+
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
+        config.tokenizer,
+        max_seq_length=config.max_ans_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config
+
+
+def setup_evaluate_bart(test_path, config):
+    config.test_dataset = Dataset.load_from_disk(test_path)
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = bart_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    logger.info("model and tokenizer initialized")
+
+    config.test_batches = prepare_inputs(
+        config.test_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config
