@@ -19,6 +19,7 @@ runmode = [
     "t5-pretrain",
     "bart-finetune",
     "bart-pretrain",
+    "bart-evaluate",
     "bert-finetune",
     "bert-evaluate",
 ]
@@ -109,7 +110,19 @@ def main(argv):
         tuner()
 
     elif runmode == "bart-evaluate":
-        None
+        config = bart_utils.BARTCFG(
+            name=FLAGS.name,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            max_seq_length=FLAGS.max_seq_len,
+            max_ans_length=FLAGS.max_ans_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bart_utils.setup_evaluate_bart(test_ds_path, config)
+        # @HERE :: make sure setup function is good, then finish training loop
+        evaluater = EvaluateBART(config)
+        evaluater()
 
     elif runmode == "bert-finetune":
         config = bert_utils.BERTCFG(

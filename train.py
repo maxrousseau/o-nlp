@@ -41,9 +41,22 @@ class BaseTester:
 
         self.padding = config.padding
         self.stride = config.stride
+        self.seed = config.seed
 
         # defined locally
         self.test_dataloader = None
+
+        # set all seed
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
+        torch.cuda.manual_seed(self.seed)
+
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        self.g = torch.Generator()
+        self.g.manual_seed(self.seed)
 
 
 class BaseTrainer:
@@ -711,6 +724,7 @@ class FinetuneBART(BaseTrainer):
             for i in answer_batches
         ]
         eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
+        print(eval_outputs)
 
         score, predictions, targets = bart_utils.evaluate(
             eval_outputs, self.val_dataset
@@ -866,6 +880,81 @@ class EvaluateBERT(BaseTester):
 
 class EvaluateBART(BaseTester):
     """ """
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_ans_length = config.max_ans_length
+        self.max_seq_length = config.max_seq_length
+
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
+        # create logger with 'spam_application'
+        self.logger = logging.getLogger("eval_logger")
+        self.logger.setLevel(logging.DEBUG)
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+
+    def get_dataloaders(self):
+        label_pad_token_id = -100
+        data_collator = DataCollatorForSeq2Seq(
+            self.tokenizer,
+            model=self.model,
+            label_pad_token_id=label_pad_token_id,
+            pad_to_multiple_of=8,
+        )
+
+        test_tensor = self.test_batches.remove_columns(["example_id"])
+        test_tensor.set_format("torch")
+        self.test_dataloader = DataLoader(
+            test_tensor,
+            collate_fn=data_collator,
+            batch_size=4,
+            shuffle=False,
+        )
+
+        self.logger.info("Test and validation dataloaders created")
+
+    @torch.no_grad()
+    def __call__(self):
+        self.get_dataloaders()
+
+        accelerator = Accelerator(mixed_precision="fp16")
+        (
+            self.model,
+            self.test_dataloader,
+        ) = accelerator.prepare(self.model, self.test_dataloader)
+
+        # run eval
+        self.model.eval()
+        answer_batches = []
+        for batch in tqdm(self.test_dataloader):
+            outputs = self.model.generate(
+                **batch, max_length=self.max_ans_length, num_beams=1
+            )
+            for i in outputs:
+                answer_batches.append(i)
+
+        predicted_answers = [
+            bart_utils.clean_outputs(i, tokenizer=self.tokenizer)
+            for i in answer_batches
+        ]
+        eval_outputs = list(zip(self.test_batches["example_id"], predicted_answers))
+        print(eval_outputs)
+
+        score, predictions, targets = bart_utils.evaluate(
+            eval_outputs, self.test_dataset
+        )
+        f1_score = score["f1"]
+        em = score["exact_match"]
+
+        # logging
+        self.logger.info(
+            "\n{} \nEvaluation results \nmodel : {} \n > F1 = {} \n > EM = {} \n{}".format(
+                "*" * 50, self.name, f1_score, em, "*" * 50
+            )
+        )
 
 
 class EvaluateT5(BaseTester):

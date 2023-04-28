@@ -171,11 +171,12 @@ def preprocess_validation(
 def clean_outputs(output_ids, tokenizer=None):
     """take the logit outputs from a sample of the seq2seq LM and turn it into a string for evaluation!"""
     out = tokenizer.decode(output_ids, skip_special_tokens=True)
+    out = out.lower()
 
     try:
-        answer_start = out.find("Answer: ") + 8
-        answer_end = out.find("Context")
-        answer = out[answer_start:answer_end]
+        answer_start = out.find("answer: ") + 8
+        answer_end = out.find(". context")
+        answer = out[answer_start:answer_end].strip()
     except:
         answer = ""
 
@@ -287,7 +288,9 @@ def setup_finetune_bart(train_path, val_path, config):
 
 
 def setup_evaluate_bart(test_path, config):
-    config.test_dataset = Dataset.load_from_disk(test_path)
+    config.test_dataset = bart_format_mi(
+        Dataset.load_from_disk(test_path).select(range(4))
+    )
 
     logger.info("datasets loaded from disk")
 
@@ -300,8 +303,7 @@ def setup_evaluate_bart(test_path, config):
     config.test_batches = prepare_inputs(
         config.test_dataset,
         config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
+        max_seq_length=config.max_seq_length,
         padding=config.padding,
         subset="eval",
     )
