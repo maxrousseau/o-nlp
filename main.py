@@ -16,6 +16,7 @@ FLAGS = flags.FLAGS
 
 runmode = [
     "t5-finetune",
+    "t5-evaluate",
     "t5-pretrain",
     "bart-finetune",
     "bart-pretrain",
@@ -87,8 +88,23 @@ def main(argv):
             runmode=FLAGS.runmode,
         )
         config = t5_utils.setup_finetune_t5(train_ds_path, val_ds_path, config)
-        tuner = FineTuneT5(config)
+        tuner = FinetuneT5(config)
         tuner()
+
+    elif runmode == "t5-evaluate":
+        config = t5_utils.T5CFG(
+            name=FLAGS.name,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            max_seq_length=FLAGS.max_seq_len,
+            max_ans_length=FLAGS.max_ans_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = t5_utils.setup_evaluate_t5(test_ds_path, config)
+        # @HERE :: make sure setup function is good, then finish training loop
+        evaluator = EvaluateT5(config)
+        evaluator()
 
     elif runmode == "bart-finetune":
         config = bart_utils.BARTCFG(

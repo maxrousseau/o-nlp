@@ -122,7 +122,7 @@ class BaseTrainer:
         self.model.save_pretrained(path)
 
 
-class FineTuneT5(BaseTrainer):
+class FinetuneT5(BaseTrainer):
     """
 
     Everything that is dynamic is defined here: dataloader, training and evaluation loop, model export, etc.
@@ -167,12 +167,7 @@ class FineTuneT5(BaseTrainer):
             collate_fn=data_collator,
             batch_size=4,
         )
-        self.test_dataloader = DataLoader(
-            test_tensor,
-            shuffle=False,
-            collate_fn=data_collator,
-            batch_size=4,
-        )
+
         self.logger.info("Training, validation and test dataloaders created")
         # shuffle only train...
 
@@ -207,7 +202,6 @@ class FineTuneT5(BaseTrainer):
         predicted_answers = [
             t5_utils.clean_outputs(i, self.tokenizer) for i in answer_batch
         ]
-        # print(predicted_answers)
 
         eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
 
@@ -221,7 +215,10 @@ class FineTuneT5(BaseTrainer):
         # We start the fine-tuning code here, essentially we feed it a model and some data and it trains it and
         # logs the loss/results/weigths that is all....
         self.get_dataloaders()
-        local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        save_path = os.path.abspath(
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
         # wandb.init(
         #     project="o-nlp",
         #     config={
@@ -247,7 +244,7 @@ class FineTuneT5(BaseTrainer):
             )
 
         if torch.device != "cpu":
-            # @BUG mixed precision breaks generation
+            # @BUG mixed precision breaks t5
             # mixed_precision="bf16" ? issues witht T5 models...
             accelerator = Accelerator()
             (
@@ -295,7 +292,7 @@ class FineTuneT5(BaseTrainer):
             # save the best model
             if f1_score > best_f1:
                 best_f1 = f1_score
-                self.save_model(local_path)
+                self.save_model(save_path)
                 self.logger.info("new best model saved!")
 
         # @TODO :: next re
@@ -721,7 +718,6 @@ class FinetuneBART(BaseTrainer):
             for i in answer_batches
         ]
         eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
-        print(eval_outputs)
 
         score, predictions, targets = bart_utils.evaluate(
             eval_outputs, self.val_dataset
@@ -938,7 +934,6 @@ class EvaluateBART(BaseTester):
             for i in answer_batches
         ]
         eval_outputs = list(zip(self.test_batches["example_id"], predicted_answers))
-        print(eval_outputs)
 
         score, predictions, targets = bart_utils.evaluate(
             eval_outputs, self.test_dataset
@@ -956,3 +951,77 @@ class EvaluateBART(BaseTester):
 
 class EvaluateT5(BaseTester):
     """ """
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_ans_length = config.max_ans_length
+        self.max_seq_length = config.max_seq_length
+
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
+        # create logger with 'spam_application'
+        self.logger = logging.getLogger("eval_logger")
+        self.logger.setLevel(logging.DEBUG)
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+
+    def get_dataloaders(self):
+        label_pad_token_id = -100
+        data_collator = DataCollatorForSeq2Seq(
+            self.tokenizer,
+            model=self.model,
+            label_pad_token_id=label_pad_token_id,
+            pad_to_multiple_of=8,
+        )
+
+        test_tensor = self.test_batches.remove_columns(["example_id"])
+        test_tensor.set_format("torch")
+        self.test_dataloader = DataLoader(
+            test_tensor,
+            collate_fn=data_collator,
+            batch_size=4,
+            shuffle=False,
+        )
+
+        self.logger.info("Test and validation dataloaders created")
+
+    @torch.no_grad()
+    def __call__(self):
+        self.get_dataloaders()
+
+        accelerator = Accelerator()
+        (
+            self.model,
+            self.test_dataloader,
+        ) = accelerator.prepare(self.model, self.test_dataloader)
+
+        # run eval
+        self.model.eval()
+        answer_batch = []
+        for i, batch in enumerate(tqdm(self.test_dataloader)):
+            outputs = self.model.generate(
+                **batch,
+                max_length=25,
+                num_beams=1,
+            )
+            for i in outputs:
+                answer_batch.append(i)
+
+        predicted_answers = [
+            t5_utils.clean_outputs(i, self.tokenizer) for i in answer_batch
+        ]
+
+        eval_outputs = list(zip(self.test_batches["example_id"], predicted_answers))
+
+        score, predictions, targets = t5_utils.evaluate(eval_outputs, self.test_dataset)
+
+        f1_score = score["f1"]
+        em = score["exact_match"]
+        # logging
+        self.logger.info(
+            "\n{} \nEvaluation results \nmodel : {} \n > F1 = {} \n > EM = {} \n{}".format(
+                "*" * 50, self.name, f1_score, em, "*" * 50
+            )
+        )

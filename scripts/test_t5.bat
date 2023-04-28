@@ -3,11 +3,11 @@ python main.py^
  --lr=3e-4^
  --epochs=1^
  --lr_scheduler=True^
- --model_checkpoint="google/t5-efficient-mini"^
- --tokenizer_checkpoint="google/t5-efficient-mini"^
+ --model_checkpoint="t5-small"^
+ --tokenizer_checkpoint="t5-small"^
  --train_dataset="./tmp/bin/train"^
  --val_dataset="./tmp/bin/val"^
- --max_seq_len=384^
+ --max_seq_len=512^
  --max_ans_len=128^
  --seed=0^
  --runmode="t5-finetune"^

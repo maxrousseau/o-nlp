@@ -391,10 +391,8 @@ def evaluate_pretraining(outputs, target_answers):
 def setup_finetune_t5(train_path, val_path, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
-    config.train_dataset = t5_format_mi(
-        Dataset.load_from_disk(train_path).select(range(4))
-    )
-    config.val_dataset = t5_format_mi(Dataset.load_from_disk(val_path).select(range(4)))
+    config.train_dataset = t5_format_mi(Dataset.load_from_disk(train_path))
+    config.val_dataset = t5_format_mi(Dataset.load_from_disk(val_path))
 
     logger.info("Masked QA datasets loaded from file")
 
@@ -403,7 +401,6 @@ def setup_finetune_t5(train_path, val_path, config):
     )
     logger.info("Model and tokenizers loaded")
 
-    # @TODO :: implement val split here and return both training and validation!!!!
     config.train_batches = prepare_inputs(
         config.train_dataset,
         config.tokenizer,
@@ -415,6 +412,29 @@ def setup_finetune_t5(train_path, val_path, config):
 
     config.val_batches = prepare_inputs(
         config.val_dataset,
+        config.tokenizer,
+        padding=config.padding,
+        max_seq_length=config.max_seq_length,
+        subset="eval",
+    )
+
+    return config
+
+
+def setup_evaluate_t5(test_path, config):
+    """call t5 setup from config, return everything that is necessary for fine-tuning"""
+    # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
+    config.test_dataset = t5_format_mi(Dataset.load_from_disk(test_path))
+
+    logger.info("Test dataset loaded from disk and formatted to mask-filling")
+
+    config.model, config.tokenizer = t5_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+    logger.info("Model and tokenizers loaded")
+
+    config.test_batches = prepare_inputs(
+        config.test_dataset,
         config.tokenizer,
         padding=config.padding,
         max_seq_length=config.max_seq_length,

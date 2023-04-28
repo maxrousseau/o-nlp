@@ -258,12 +258,8 @@ def evaluate(eval_outputs, answers):
 
 def setup_finetune_bart(train_path, val_path, config):
     """"""
-    config.train_dataset = bart_format_mi(
-        Dataset.load_from_disk(train_path).select(range(4))
-    )
-    config.val_dataset = bart_format_mi(
-        Dataset.load_from_disk(val_path).select(range(4))
-    )
+    config.train_dataset = bart_format_mi(Dataset.load_from_disk(train_path))
+    config.val_dataset = bart_format_mi(Dataset.load_from_disk(val_path))
 
     logger.info("Training and validation datasets loaded from disk")
 
@@ -294,9 +290,7 @@ def setup_finetune_bart(train_path, val_path, config):
 
 
 def setup_evaluate_bart(test_path, config):
-    config.test_dataset = bart_format_mi(
-        Dataset.load_from_disk(test_path).select(range(4))
-    )
+    config.test_dataset = bart_format_mi(Dataset.load_from_disk(test_path))
 
     logger.info("datasets loaded from disk")
 
