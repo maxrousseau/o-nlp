@@ -1,0 +1,14 @@
+python main.py^
+ --name="t5-test"^
+ --lr=3e-4^
+ --epochs=1^
+ --lr_scheduler=True^
+ --model_checkpoint="google/t5-efficient-mini"^
+ --tokenizer_checkpoint="google/t5-efficient-mini"^
+ --train_dataset="./tmp/bin/train"^
+ --val_dataset="./tmp/bin/val"^
+ --max_seq_len=384^
+ --max_ans_len=128^
+ --seed=0^
+ --runmode="t5-finetune"^
+ --savedir="./test_path"^

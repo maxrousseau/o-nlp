@@ -4,6 +4,7 @@
 #                      T5 Implementation for OQA                              #
 ###############################################################################
 import logging
+import gc
 
 import torch
 from torch.optim import AdamW
@@ -29,6 +30,14 @@ datasets.utils.logging.set_verbosity_warning
 from dataclasses import dataclass
 from typing import Any
 
+import pyarrow as pa
+
+import evaluate
+
+metric = evaluate.load("squad")
+
+datasets.utils.logging.set_verbosity_warning
+
 
 FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
 logging.basicConfig(format=FORMAT)
@@ -42,15 +51,14 @@ class T5CFG:
     lr: float = 2e-5
     n_epochs: int = 12
     lr_scheduler: bool = True
-    model_checkpoint: str = "google/t5-v1_1-base"
-    tokenizer_checkpoint: str = "google/t5-v1_1-base"
+    model_checkpoint: str = ""
+    tokenizer_checkpoint: str = ""
     checkpoint_savedir: str = "./t5-ckpt"
-    max_seq_length: int = 384
+    max_seq_length: int = 512
     max_ans_length: int = 128
     stride: int = 128
     padding: str = "max_length"
     seed: str = 0
-    lora: bool = False
 
     load_from_checkpoint: bool = False
     checkpoint_state: str = None
@@ -71,6 +79,41 @@ class T5CFG:
     # def __repr__() -> str
 
 
+def t5_format_mi(dataset):
+    """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper
+    "Question: a question? Answer: <mask>. Context: this is the context"
+
+    USAGE:
+        train_raw = Dataset.from_dict(formatToMI(dset[2]))
+        test_raw = Dataset.from_dict(formatToMI(dset[3]))
+
+        # then you can feed those to the FsBART model class at initialization to run
+
+    """
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    questions = pa.array(dataset["question"])
+    answers = pa.array([i["text"][0] for i in dataset["answers"]])
+
+    masked_strings = pa.compute.binary_join_element_wise(
+        "Question: ", questions, " Answer: <extra_id_0> Context: ", contexts, ""
+    )
+    # Important not to include the "." character at the end of the answer otherwise the model generates double dots
+    target_answers = pa.compute.binary_join_element_wise(
+        "<extra_id_0> ", answers, "<extra_id_1>", ""
+    )
+
+    gc.enable()
+
+    return Dataset.from_dict(
+        {
+            "masked_strings": masked_strings.to_pylist(),
+            "answer_strings": target_answers.to_pylist(),
+            "id": dataset["id"],
+        }
+    )
+
+
 def print_trainable_parameters(model):
     """
     Prints the number of trainable parameters in the model.
@@ -89,37 +132,37 @@ def print_trainable_parameters(model):
     )
 
 
-def t5_init(model_checkpoint, tokenizer_checkpoint, mode=None, lora=False):
+def t5_init(model_checkpoint, tokenizer_checkpoint):
     """initialize model and tokenizer, mode=Default, LoRA"""
 
     model = T5ForConditionalGeneration.from_pretrained(model_checkpoint)
     tokenizer = T5Tokenizer.from_pretrained(tokenizer_checkpoint)
 
-    if lora:
-        # TODO add lora
-        # hyperparams from:
-        # https://github.com/huggingface/peft/blob/main/examples/conditional_generation/peft_lora_seq2seq.ipynb
-        # peft_config = LoraConfig(task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=8, lora_alpha=32,
-        # lora_dropout=0.1)
-        # IMPORTANT: loss should be increased and hyperparams explored for LoRA (start with 2e-4)
-        # IDK if this is truly worth exploring... maybe better to focus of further pre-training methods.
-        for param in model.parameters():
-            param.requires_grad = False  # freeze the model - train adapters later
-            if param.ndim == 1:
-                # cast the small parameters (e.g. layernorm) to fp32 for stability
-                param.data = param.data.to(torch.float32)
+    # if lora:
+    #     # TODO add lora
+    #     # hyperparams from:
+    #     # https://github.com/huggingface/peft/blob/main/examples/conditional_generation/peft_lora_seq2seq.ipynb
+    #     # peft_config = LoraConfig(task_type=TaskType.SEQ_2_SEQ_LM, inference_mode=False, r=8, lora_alpha=32,
+    #     # lora_dropout=0.1)
+    #     # IMPORTANT: loss should be increased and hyperparams explored for LoRA (start with 2e-4)
+    #     # IDK if this is truly worth exploring... maybe better to focus of further pre-training methods.
+    #     for param in model.parameters():
+    #         param.requires_grad = False  # freeze the model - train adapters later
+    #         if param.ndim == 1:
+    #             # cast the small parameters (e.g. layernorm) to fp32 for stability
+    #             param.data = param.data.to(torch.float32)
 
-        config = LoraConfig(
-            r=8,
-            lora_alpha=32,
-            lora_dropout=0.1,
-            bias="none",
-            task_type=TaskType.SEQ_2_SEQ_LM,
-            inference_mode=False,
-        )
+    #     config = LoraConfig(
+    #         r=8,
+    #         lora_alpha=32,
+    #         lora_dropout=0.1,
+    #         bias="none",
+    #         task_type=TaskType.SEQ_2_SEQ_LM,
+    #         inference_mode=False,
+    #     )
 
-        model = get_peft_model(model, config)
-    print_trainable_parameters(model)
+    #     model = get_peft_model(model, config)
+    # print_trainable_parameters(model)
 
     return model, tokenizer
 
@@ -180,7 +223,6 @@ def prepare_inputs(
     max_seq_length=None,
     max_ans_length=None,
     subset=None,
-    test_size=0.2,
 ):
     """prepare either the training, validation or test"""
 
@@ -194,20 +236,15 @@ def prepare_inputs(
             remove_columns=examples.column_names,
         )
 
-        tokenized_dataset = tokenized_dataset.train_test_split(
-            test_size=test_size, shuffle=False
-        )  # training/test were
-        # shuffled prior to loading
-
         logger.info(
-            "{} dataset processed and tokenized, n-train = {}, n-val = {}".format(
-                subset, len(tokenized_dataset["train"]), len(tokenized_dataset["test"])
+            "{} dataset processed and tokenized, n = {}".format(
+                subset, len(tokenized_dataset)
             )
         )
 
-        return tokenized_dataset["train"], tokenized_dataset["test"]
+        return tokenized_dataset
 
-    elif subset == "test":
+    elif subset == "eval":
         tokenized_dataset = examples.map(
             lambda example: preprocess_validation(
                 example, tokenizer, padding, max_seq_length
@@ -216,7 +253,7 @@ def prepare_inputs(
             remove_columns=examples.column_names,
         )
         logger.info(
-            "{} dataset processed and tokenized, n-test = {}".format(
+            "{} dataset processed and tokenized, n = {}".format(
                 subset, len(tokenized_dataset)
             )
         )
@@ -326,7 +363,6 @@ def evaluate(outputs, target_answers):
         )
         predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
 
-    metric = load_metric("squad")
     m = metric.compute(predictions=predicted_answers, references=theoretical_answers)
 
     return m, predicted_answers, theoretical_answers
@@ -352,21 +388,23 @@ def evaluate_pretraining(outputs, target_answers):
     return m, predicted_answers, theoretical_answers
 
 
-def setup_finetune_t5(train_path, test_path, config):
+def setup_finetune_t5(train_path, val_path, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
-    oqa_dataset = load_mini_oqa(train_path, test_path)
+    # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
+    config.train_dataset = t5_format_mi(
+        Dataset.load_from_disk(train_path).select(range(4))
+    )
+    config.val_dataset = t5_format_mi(Dataset.load_from_disk(val_path).select(range(4)))
 
-    config.train_dataset = Dataset.from_dict(t5_format_mi(oqa_dataset[2]))
-    config.test_dataset = Dataset.from_dict(t5_format_mi(oqa_dataset[3]))
     logger.info("Masked QA datasets loaded from file")
 
     config.model, config.tokenizer = t5_init(
-        config.model_checkpoint, config.tokenizer_checkpoint, lora=config.lora
+        config.model_checkpoint, config.tokenizer_checkpoint
     )
     logger.info("Model and tokenizers loaded")
 
     # @TODO :: implement val split here and return both training and validation!!!!
-    config.train_batches, config.val_batches = prepare_inputs(
+    config.train_batches = prepare_inputs(
         config.train_dataset,
         config.tokenizer,
         padding=config.padding,
@@ -375,12 +413,12 @@ def setup_finetune_t5(train_path, test_path, config):
         subset="train",
     )
 
-    config.test_batches = prepare_inputs(
-        config.test_dataset,
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
         config.tokenizer,
         padding=config.padding,
         max_seq_length=config.max_seq_length,
-        subset="test",
+        subset="eval",
     )
 
     return config

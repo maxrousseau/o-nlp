@@ -118,7 +118,11 @@ def bart_format_mi(dataset):
 
 
 def preprocess_training(
-    examples, tokenizer=None, padding="max_length", max_seq_length=512
+    examples,
+    tokenizer=None,
+    padding="max_length",
+    max_seq_length=512,
+    max_ans_length=256,
 ):
     """ """
     source, target = examples["masked_strings"], examples["qa_strings"]
@@ -134,7 +138,7 @@ def preprocess_training(
     target_tokenized = tokenizer(
         target,
         padding=padding,
-        max_length=max_seq_length,
+        max_length=max_ans_length,
         truncation=True,
     )
 
@@ -150,7 +154,7 @@ def preprocess_training(
 
 
 def preprocess_validation(
-    examples, tokenizer=None, padding="max_length", max_seq_length=128
+    examples, tokenizer=None, padding="max_length", max_seq_length=512
 ):
     """ """
     source = examples["masked_strings"]
@@ -189,6 +193,7 @@ def prepare_inputs(
     subset=None,
     padding="max_length",
     max_seq_length=512,
+    max_ans_length=None,
 ):
     if subset == "train":
         # do this
@@ -272,6 +277,7 @@ def setup_finetune_bart(train_path, val_path, config):
         config.train_dataset,
         config.tokenizer,
         max_seq_length=config.max_seq_length,
+        max_ans_length=config.max_ans_length,
         padding=config.padding,
         subset="train",
     )

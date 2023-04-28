@@ -134,7 +134,7 @@ class FineTuneT5(BaseTrainer):
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
 
-    def __get_dataloaders(self):
+    def get_dataloaders(self):
         train_tensor = self.train_batches.remove_columns(["example_id"])
         val_tensor = self.val_batches.remove_columns(["example_id"])
         test_tensor = self.val_batches.remove_columns(["example_id"])
@@ -190,22 +190,47 @@ class FineTuneT5(BaseTrainer):
             {"id": self.val_batches["example_id"], "answer_strings": val_targets}
         )
 
+    @torch.no_grad()
+    def _eval(self, accelerator):
+        """ """
+        self.model.eval()
+        answer_batch = []
+        for i, batch in enumerate(tqdm(self.val_dataloader)):
+            outputs = self.model.generate(
+                **batch,
+                max_length=25,
+                num_beams=1,
+            )
+            for i in outputs:
+                answer_batch.append(i)
+
+        predicted_answers = [
+            t5_utils.clean_outputs(i, self.tokenizer) for i in answer_batch
+        ]
+        # print(predicted_answers)
+
+        eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
+
+        score, predictions, targets = t5_utils.evaluate(eval_outputs, self.val_dataset)
+
+        return score, predictions
+
     def __call__(self):
         """simply call the finetuning"""
 
         # We start the fine-tuning code here, essentially we feed it a model and some data and it trains it and
         # logs the loss/results/weigths that is all....
-        self.__get_dataloaders()
+        self.get_dataloaders()
         local_path = os.path.abspath("{}-{}".format(self.checkpoint_savedir, self.name))
-        wandb.init(
-            project="o-nlp",
-            config={
-                "learning_rate": self.lr,
-                "architecture": "t5-small-test",
-                "dataset": "oqa-alpha",
-                "epochs": self.num_epochs,
-            },
-        )
+        # wandb.init(
+        #     project="o-nlp",
+        #     config={
+        #         "learning_rate": self.lr,
+        #         "architecture": "t5-small-test",
+        #         "dataset": "oqa-alpha",
+        #         "epochs": self.num_epochs,
+        #     },
+        # )
 
         # training loop **************************************************
 
@@ -223,6 +248,7 @@ class FineTuneT5(BaseTrainer):
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
+            # mixed_precision="bf16" ? issues witht T5 models...
             accelerator = Accelerator()
             (
                 self.model,
@@ -235,7 +261,7 @@ class FineTuneT5(BaseTrainer):
 
         progressbar = tqdm(range(num_training_steps))
 
-        val_targets = self.__get_val_answers()
+        # val_targets = self.__get_val_answers()
 
         for epoch in range(self.num_epochs):
             self.model.train()
@@ -254,32 +280,7 @@ class FineTuneT5(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-            answer_batch = []
-            for i, batch in enumerate(tqdm(self.val_dataloader)):
-                self.model.eval()
-                with torch.no_grad():
-                    batch.pop("labels")
-                    batch.pop("decoder_input_ids")
-                    batch.pop("attention_mask")
-
-                    outputs = self.model.generate(
-                        **batch,
-                        max_length=25,
-                        num_beams=1,
-                    )
-                    for i in outputs:
-                        answer_batch.append(i)
-
-            predicted_answers = [
-                t5_utils.clean_outputs(i, self.tokenizer) for i in answer_batch
-            ]
-            # print(predicted_answers)
-
-            eval_outputs = list(zip(self.val_batches["example_id"], predicted_answers))
-
-            score, predictions, targets = t5_utils.evaluate(eval_outputs, val_targets)
-
-            # print(list(zip(predictions, targets)))
+            score, predictions = self._eval(accelerator)
             f1_score = score["f1"]
 
             self.logger.info(
@@ -287,23 +288,19 @@ class FineTuneT5(BaseTrainer):
                     epoch, float(loss.cpu()), score
                 )
             )
-            wandb.log({"loss": loss, "val_f1": f1_score})
+            # wandb.log({"loss": loss, "val_f1": f1_score})
 
             # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
             # save the best model
             if f1_score > best_f1:
                 best_f1 = f1_score
-                if os.path.isfile(local_path):
-                    shutil.rmtree(local_path)
-                self.model.save_pretrained(local_path)
+                self.save_model(local_path)
                 self.logger.info("new best model saved!")
 
         # @TODO :: next re
 
         self.logger.info("Best model f1 = {}".format(best_f1))
-
-        return None
 
 
 class PretrainT5(BaseTrainer):
