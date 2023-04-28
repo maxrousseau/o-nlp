@@ -1,3 +1,4 @@
+import os
 import json
 
 from datasets import Dataset, concatenate_datasets
@@ -38,7 +39,7 @@ def load_from_json(fpath):
 def split_by_topic(dataset, val_split=0.12, test_split=0.18):
     """ """
 
-    topics = set(dataset["topic"])
+    topics = sorted(set(dataset["topic"]))
 
     train = []
     val = []
@@ -74,3 +75,41 @@ def create_dataset(fpath, save_dir):
     train_dataset.to_json(os.path.join(save_dir, "json/train.json"))
     val_dataset.to_json(os.path.join(save_dir, "json/val.json"))
     test_dataset.to_json(os.path.join(save_dir, "json/test.json"))
+
+
+def longest_answer(dataset, tokenizer):
+    answer_lengths = []
+    qc_lengths = []
+    qa_lengths = []
+    for i in dataset:
+        answer_lengths.append(len(tokenizer.tokenize(i["answers"]["text"][0])))
+        qa_lengths.append(
+            len(
+                tokenizer.tokenize("question : " + i["question"] + ". answer :")
+                + tokenizer.tokenize(i["answers"]["text"][0])
+            )
+        )
+        qc_lengths.append(
+            len(
+                tokenizer.tokenize(
+                    "question: " + i["question"] + ". answer : [MASK]. context: "
+                )
+                + tokenizer.tokenize(i["context"])
+            )
+        )
+
+    return {"answer": max(answer_lengths), "qc": max(qc_lengths), "qa": max(qa_lengths)}
+
+
+def main():
+
+    raw_json_path = (
+        "C:/Users/roum5/source/data/oqa/oqa-v1.0-fullset/oqa-v1.0-26feb2023.json"
+    )
+    dump_path = "./tmp/oqa_shuffled_split"
+
+    create_dataset(raw_json_path, dump_path)
+
+
+if __name__ == "__main__":
+    main()
