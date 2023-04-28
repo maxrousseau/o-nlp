@@ -279,7 +279,7 @@ def setup_finetune_bart(train_path, val_path, config):
     config.val_batches = prepare_inputs(
         config.val_dataset,
         config.tokenizer,
-        max_seq_length=config.max_ans_length,
+        max_seq_length=config.max_seq_length,
         padding=config.padding,
         subset="eval",
     )
