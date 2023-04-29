@@ -219,15 +219,15 @@ class FinetuneT5(BaseTrainer):
         save_path = os.path.abspath(
             "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
-        # wandb.init(
-        #     project="o-nlp",
-        #     config={
-        #         "learning_rate": self.lr,
-        #         "architecture": "t5-small-test",
-        #         "dataset": "oqa-alpha",
-        #         "epochs": self.num_epochs,
-        #     },
-        # )
+        wandb.init(
+            project="o-nlp",
+            config={
+                "learning_rate": self.lr,
+                "architecture": self.name,
+                "dataset": "oqa",
+                "epochs": self.num_epochs,
+            },
+        )
 
         # training loop **************************************************
 
@@ -260,12 +260,14 @@ class FinetuneT5(BaseTrainer):
 
         # val_targets = self.__get_val_answers()
 
+        losses = {"train": []}
         for epoch in range(self.num_epochs):
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
 
                 outputs = self.model(**batch)
                 loss = outputs.loss
+                losses["train"].append(loss.detach().numpy())
                 if torch.device != "cpu":
                     accelerator.backward(loss)
                 else:
@@ -285,7 +287,9 @@ class FinetuneT5(BaseTrainer):
                     epoch, float(loss.cpu()), score
                 )
             )
-            # wandb.log({"loss": loss, "val_f1": f1_score})
+            wandb.log(
+                {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
+            )
 
             # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
 
@@ -592,8 +596,8 @@ class FinetuneBERT(BaseTrainer):
             project="o-nlp",
             config={
                 "learning_rate": self.lr,
-                "architecture": "bert-test",
-                "dataset": "oqa-val",
+                "architecture": self.name,
+                "dataset": "oqa",
                 "epochs": self.num_epochs,
             },
         )
@@ -646,7 +650,9 @@ class FinetuneBERT(BaseTrainer):
             # eval
             f1_score = self.__eval(accelerator)
             self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
-            wandb.log({"f1": f1_score, "train_loss": np.array(losses["train"]).mean()})
+            wandb.log(
+                {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
+            )
 
             # checkpointing (only best_val)
             if f1_score > best_f1:
@@ -739,6 +745,17 @@ class FinetuneBART(BaseTrainer):
         num_update_steps_per_epoch = len(self.train_dataloader)
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
 
+        # experiment tracking
+        wandb.init(
+            project="o-nlp",
+            config={
+                "learning_rate": self.lr,
+                "architecture": self.name,
+                "dataset": "oqa",
+                "epochs": self.num_epochs,
+            },
+        )
+
         # accelerator
         if self.lr_scheduler:
             lr_scheduler = get_scheduler(
@@ -781,7 +798,9 @@ class FinetuneBART(BaseTrainer):
             # eval
             f1_score = self.__eval(accelerator)
             self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
-            # wandb.log({"f1": f1_score, "train_loss": np.array(losses["train"]).mean()})
+            wandb.log(
+                {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
+            )
 
             # checkpointing (only best_val)
             if f1_score > best_f1:
