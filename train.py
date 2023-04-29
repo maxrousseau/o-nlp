@@ -267,7 +267,7 @@ class FinetuneT5(BaseTrainer):
 
                 outputs = self.model(**batch)
                 loss = outputs.loss
-                losses["train"].append(loss.detach().numpy())
+                losses["train"].append(loss.detach().cpu().numpy())
                 if torch.device != "cpu":
                     accelerator.backward(loss)
                 else:
@@ -640,7 +640,7 @@ class FinetuneBERT(BaseTrainer):
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 accelerator.backward(loss)
-                losses["train"].append(loss.detach().numpy())
+                losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
                 lr_scheduler.step()
@@ -788,7 +788,7 @@ class FinetuneBART(BaseTrainer):
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 accelerator.backward(loss)
-                losses["train"].append(loss.detach().numpy())
+                losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
                 lr_scheduler.step()
