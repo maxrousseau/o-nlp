@@ -220,7 +220,7 @@ class FinetuneT5(BaseTrainer):
             "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
         wandb.init(
-            project="o-nlp",
+            project="o-nlp_experiments",
             config={
                 "learning_rate": self.lr,
                 "architecture": self.name,
@@ -401,7 +401,7 @@ class PretrainT5(BaseTrainer):
         )
 
         wandb.init(
-            project="o-nlp",
+            project="o-nlp_experiments",
             config={
                 "learning_rate": self.lr,
                 "architecture": "t5-pretraining-test",
@@ -593,7 +593,7 @@ class FinetuneBERT(BaseTrainer):
 
         # experiment tracking
         wandb.init(
-            project="o-nlp",
+            project="o-nlp_experiments",
             config={
                 "learning_rate": self.lr,
                 "architecture": self.name,
@@ -747,7 +747,7 @@ class FinetuneBART(BaseTrainer):
 
         # experiment tracking
         wandb.init(
-            project="o-nlp",
+            project="o-nlp_experiments",
             config={
                 "learning_rate": self.lr,
                 "architecture": self.name,
