@@ -1003,8 +1003,10 @@ class EvaluateT5(BaseTester):
     @torch.no_grad()
     def __call__(self):
         self.get_dataloaders()
-
-        accelerator = Accelerator()
+        self.model, percent_reset = t5_fp16_utils.search_and_reset_layers(
+            self.model, self.tokenizer, scale_down_factor=2, revert_old=False
+        )
+        accelerator = Accelerator(mixed_precision="fp16")
         (
             self.model,
             self.test_dataloader,
