@@ -246,7 +246,7 @@ class FinetuneT5(BaseTrainer):
         if torch.device != "cpu":
             # @BUG mixed precision breaks t5
             # mixed_precision="bf16" ? issues witht T5 models...
-            accelerator = Accelerator(mixed_precision="fp16")
+            accelerator = Accelerator()
             (
                 self.model,
                 optimizer,
