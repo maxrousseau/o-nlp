@@ -171,20 +171,6 @@ class FinetuneT5(BaseTrainer):
         self.logger.info("Training, validation and test dataloaders created")
         # shuffle only train...
 
-    def __get_val_answers(self):
-        """ """
-        val_targets = []
-        for sample in self.val_batches["labels"]:
-            val_targets.append(
-                self.tokenizer.decode(
-                    [tok for tok in sample if tok != -100], skip_special_tokens=True
-                )
-            )
-
-        return Dataset.from_dict(
-            {"id": self.val_batches["example_id"], "answer_strings": val_targets}
-        )
-
     @torch.no_grad()
     def _eval(self, accelerator):
         """ """
@@ -290,7 +276,7 @@ class FinetuneT5(BaseTrainer):
 
             self.logger.info(
                 "Epoch: {}, Loss: {}, Validation F1: {}".format(
-                    epoch, float(loss.cpu()), score
+                    epoch, float(loss.cpu()), f1_score
                 )
             )
             wandb.log(
@@ -798,7 +784,8 @@ class FinetuneBART(BaseTrainer):
                 losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
-                lr_scheduler.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
                 optimizer.zero_grad()
                 progressbar.update(1)
 
