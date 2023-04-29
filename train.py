@@ -643,7 +643,8 @@ class FinetuneBERT(BaseTrainer):
                 losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
-                lr_scheduler.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
                 optimizer.zero_grad()
                 progressbar.update(1)
 
