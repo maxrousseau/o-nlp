@@ -262,6 +262,7 @@ def prepare_inputs(
             ),
             batched=True,
             remove_columns=dataset.column_names,
+            keep_in_memory=True,
         )
         logger.info(
             "Training dataset processed and tokenized : n = {}".format(
@@ -276,6 +277,7 @@ def prepare_inputs(
             ),
             batched=True,
             remove_columns=dataset.column_names,
+            keep_in_memory=True,
         )
         logger.info(
             "Test dataset processed and tokenized : n = {}".format(
