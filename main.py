@@ -176,7 +176,9 @@ def main(argv):
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
         )
-        config = bert_utils.setup_finetuning_squad(config, freeze=FLAGS.only_cls_head)
+        config = bert_utils.setup_finetuning_squad(
+            config, only_head=FLAGS.only_cls_head
+        )
         tuner = FinetuneBERT(config)
         tuner()
 
