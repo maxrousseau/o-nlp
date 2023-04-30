@@ -6,7 +6,7 @@ pip install datasets
 pip install sentencepiece
 pip install wandb
 
-wandb login 7a817528b63f37a967ac341e84ae3ba00dd9f18e
+wandb login $1
 
 python main.py \
  --name="biobert-ft" \

@@ -156,7 +156,9 @@ def main(argv):
         config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
 
         tuner = FinetuneBERT(config)
-        tuner()
+        from accelerate import notebook_launcher
+
+        notebook_launcher(tuner.__call__)
 
     elif runmode == "bert-evaluate":
         config = bert_utils.BERTCFG(
