@@ -610,7 +610,7 @@ class FinetuneBERT(BaseTrainer):
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
-            accelerator = Accelerator()
+            accelerator = Accelerator(mixed_precision="fp16")
             (
                 self.model,
                 optimizer,
