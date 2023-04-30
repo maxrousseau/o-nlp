@@ -22,6 +22,7 @@ runmode = [
     "bart-pretrain",
     "bart-evaluate",
     "bert-finetune",
+    "bert-squad-finetune",
     "bert-evaluate",
 ]
 
@@ -38,6 +39,10 @@ flags.DEFINE_string(
     "checkpoint_state", None, "path to the checkpoint directory to load from"
 )
 flags.DEFINE_bool("load_from_checkpoint", False, "load from a checkpoint?")
+
+flags.DEFINE_bool(
+    "only_cls_head", False, "freeze all parameters except the classification head"
+)
 
 
 flags.DEFINE_integer("max_seq_len", 384, "maximum length (tokens) of input sequence")
@@ -155,6 +160,23 @@ def main(argv):
         )
         config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
 
+        tuner = FinetuneBERT(config)
+        tuner()
+
+    elif runmode == "bert-squad-finetune":
+        config = bert_utils.BERTCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bert_utils.setup_finetuning_squad(config, freeze=FLAGS.only_cls_head)
         tuner = FinetuneBERT(config)
         tuner()
 

@@ -23,7 +23,7 @@ from transformers import (
 )
 
 import datasets
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 
 from evaluate import load
 
@@ -306,6 +306,46 @@ def setup_finetuning_oqa(train_path, val_path, config):
     config.model, config.tokenizer = bert_init(
         config.model_checkpoint, config.tokenizer_checkpoint
     )
+
+    logger.info("model and tokenizer initialized")
+
+    config.train_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config
+
+
+def setup_finetuning_squad(config, only_head=True):
+    squad = load_dataset("squad")
+    config.train_dataset = squad["train"]
+    config.val_dataset = squad["validation"]
+
+    # !bert
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    if only_head:
+        for name, param in config.model.named_parameters():
+            if "classifier" not in name:  # classifier layer
+                param.requires_grad = False
 
     logger.info("model and tokenizer initialized")
 
