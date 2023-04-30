@@ -231,6 +231,7 @@ def prepare_inputs(
             ),
             batched=True,
             remove_columns=examples.column_names,
+            keep_in_memory=True,
         )
 
         logger.info(
@@ -248,6 +249,7 @@ def prepare_inputs(
             ),
             batched=True,
             remove_columns=examples.column_names,
+            keep_in_memory=True,
         )
         logger.info(
             "{} dataset processed and tokenized, n = {}".format(
