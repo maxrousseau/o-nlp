@@ -18,7 +18,7 @@ python main.py \
      --tokenizer_checkpoint="razent/SciFive-base-Pubmed_PMC" \
      --train_dataset="/datastores/oqav1/bin/train" \
      --val_dataset="/datastores/oqav1/bin/val" \
-     --max_seq_len=896 \
+     --max_seq_len=768 \
      --max_ans_len=256 \
      --seed=0 \
      --runmode="t5-finetune" \
