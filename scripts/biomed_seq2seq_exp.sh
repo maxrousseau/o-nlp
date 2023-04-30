@@ -9,7 +9,7 @@ pip install wandb
 wandb login 7a817528b63f37a967ac341e84ae3ba00dd9f18e
 
 python main.py \
-    --name="biobart-base-sft-oqa" \
+     --name="biobart-base-sft-oqa" \
      --lr=2e-5 \
      --epochs=35 \
      --lr_scheduler=False \
