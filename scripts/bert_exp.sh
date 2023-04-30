@@ -15,8 +15,8 @@ python main.py \
  --lr_scheduler=False \
  --model_checkpoint="dmis-lab/biobert-base-cased-v1.1" \
  --tokenizer_checkpoint="dmis-lab/biobert-base-cased-v1.1" \
- --train_dataset="/datastores/oqav1/oqa_v1.0_shuffled_split/bin/train" \
- --val_dataset="/datastores/oqav1/oqa_v1.0_shuffled_split/bin/val" \
+ --train_dataset="/datastores/oqav1/bin/train" \
+ --val_dataset="/datastores/oqav1/bin/val" \
  --max_seq_len=512 \
  --seed=0 \
  --runmode="bert-finetune" \
@@ -29,8 +29,8 @@ python main.py \
  --lr_scheduler=False \
  --model_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
  --tokenizer_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
- --train_dataset="/datastores/oqav1/oqa_v1.0_shuffled_split/bin/train" \
- --val_dataset="/datastores/oqav1/oqa_v1.0_shuffled_split/bin/val" \
+ --train_dataset="/datastores/oqav1/bin/train" \
+ --val_dataset="/datastores/oqav1/bin/val" \
  --max_seq_len=512 \
  --seed=0 \
  --runmode="bert-finetune" \
