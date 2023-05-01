@@ -331,8 +331,8 @@ def setup_finetuning_oqa(train_path, val_path, config):
 
 def setup_finetuning_squad(config, only_head=True):
     squad = load_dataset("squad")
-    config.train_dataset = squad["train"].select(range(4))
-    config.val_dataset = squad["validation"].select(range(4))
+    config.train_dataset = squad["train"]
+    config.val_dataset = squad["validation"]
 
     # !bert
 
