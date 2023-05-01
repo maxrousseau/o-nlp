@@ -331,8 +331,8 @@ def setup_finetuning_oqa(train_path, val_path, config):
 
 def setup_finetuning_squad(config, only_head=True):
     squad = load_dataset("squad")
-    config.train_dataset = squad["train"]
-    config.val_dataset = squad["validation"]
+    config.train_dataset = squad["train"].select(range(4))
+    config.val_dataset = squad["validation"].select(range(4))
 
     # !bert
 
@@ -343,9 +343,8 @@ def setup_finetuning_squad(config, only_head=True):
     )
 
     if only_head:
-        for name, param in config.model.named_parameters():
-            if "classifier" not in name:  # classifier layer
-                param.requires_grad = False
+        for name, param in config.model.bert.named_parameters():
+            param.requires_grad = False
 
     logger.info("model and tokenizer initialized")
 

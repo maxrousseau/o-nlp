@@ -9,29 +9,27 @@ pip install wandb
 wandb login 7a817528b63f37a967ac341e84ae3ba00dd9f18e
 
 python main.py \
- --name="biobert-ft" \
- --lr=2e-5 \
- --epochs=35 \
- --lr_scheduler=False \
- --model_checkpoint="dmis-lab/biobert-base-cased-v1.1" \
- --tokenizer_checkpoint="dmis-lab/biobert-base-cased-v1.1" \
- --train_dataset="/datastores/oqav1/bin/train" \
- --val_dataset="/datastores/oqav1/bin/val" \
- --max_seq_len=512 \
- --seed=0 \
- --runmode="bert-finetune" \
- --savedir="./biobert_ckpts" \
-
-python main.py \
- --name="pubmedbert-ft" \
- --lr=2e-5 \
- --epochs=35 \
+ --name="pubmedbert-squad-sft" \
+ --lr=3e-5 \
+ --epochs=2 \
  --lr_scheduler=False \
  --model_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
  --tokenizer_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
- --train_dataset="/datastores/oqav1/bin/train" \
- --val_dataset="/datastores/oqav1/bin/val" \
  --max_seq_len=512 \
  --seed=0 \
- --runmode="bert-finetune" \
- --savedir="./pubmedbert_ckpts" \
+ --runmode="bert-squad-finetune" \
+ --savedir="./pubmedbert_squad_sft_ckpts" \
+ --only_cls_head=False \
+
+ python main.py \
+ --name="pubmedbert-squad-sft-headonly" \
+ --lr=3e-5 \
+ --epochs=2 \
+ --lr_scheduler=False \
+ --model_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
+ --tokenizer_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" \
+ --max_seq_len=512 \
+ --seed=0 \
+ --runmode="bert-squad-finetune" \
+ --savedir="./pubmedbert_squad_sft_ckpts" \
+ --only_cls_head=True \
