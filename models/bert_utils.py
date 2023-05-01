@@ -329,8 +329,8 @@ def setup_finetuning_oqa(train_path, val_path, config):
     return config
 
 
-def setup_finetuning_squad(config, only_head=True):
-    squad = load_dataset("squad")
+def setup_finetuning_squad(config, only_head=False):
+    squad = load_dataset("squad", download_mode="force_redownload")
     config.train_dataset = squad["train"]
     config.val_dataset = squad["validation"]
 
