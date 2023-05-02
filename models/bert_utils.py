@@ -330,7 +330,9 @@ def setup_finetuning_oqa(train_path, val_path, config):
 
 
 def setup_finetuning_squad(config, only_head=False):
-    squad = load_dataset("squad", download_mode="force_redownload")
+    squad = load_dataset(
+        "squad", download_mode="force_redownload"
+    )  # @BUG remove for caching
     config.train_dataset = squad["train"]
     config.val_dataset = squad["validation"]
 
@@ -364,6 +366,23 @@ def setup_finetuning_squad(config, only_head=False):
         padding=config.padding,
         subset="eval",
     )
+
+    return config
+
+
+def setup_pretrain_bert(train_path, val_path, config):
+    """Implement pretraining and test out using TAPT described in the "don't stop pretraining" paper
+
+        This should yield performance improvements in theory...
+
+    For the masking strategy, copy SpanBERT MLM for now
+    """
+
+    # load the datasets
+    config.train_dataset = Dataset.load_from_disk(train_path)
+    config.val_dataset = Dataset.load_from_disk(val_path)
+
+    # apply masked spans dynamically with a datacollator - see DataCollatorWholeWord and modify to get spans
 
     return config
 
