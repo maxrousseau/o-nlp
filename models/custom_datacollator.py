@@ -57,8 +57,6 @@ class DataCollatorForWholeWordSpan(DataCollatorForWholeWordMask):
         masked_lms = []
         covered_indexes = set()
         flat_cand_indexes = sum(cand_indexes, [])
-        print(type(flat_cand_indexes))
-        print(flat_cand_indexes[:20])
         for index_set in cand_indexes:
             if len(masked_lms) >= num_to_predict:
                 break
@@ -91,8 +89,6 @@ class DataCollatorForWholeWordSpan(DataCollatorForWholeWordMask):
                             m_index += 1
                     else:
                         n_tokens = 0
-        print(len(covered_indexes))
-        print(len(masked_lms))
 
         if len(covered_indexes) != len(masked_lms):
             raise ValueError(
@@ -102,6 +98,47 @@ class DataCollatorForWholeWordSpan(DataCollatorForWholeWordMask):
             1 if i in covered_indexes else 0 for i in range(len(input_tokens))
         ]
         return mask_labels
+
+    def torch_mask_tokens(self, inputs: Any, mask_labels: Any) -> Tuple[Any, Any]:
+        """
+                Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original. Set
+                'mask_labels' means we use whole word mask (wwm), we directly mask idxs according to it's ref.
+
+        MODIFICATIONS :: apply the mask token 100% of the time!!!
+        """
+        import torch
+
+        if self.tokenizer.mask_token is None:
+            raise ValueError(
+                "This tokenizer does not have a mask token which is necessary for masked language modeling. Remove the"
+                " --mlm flag if you want to use this tokenizer."
+            )
+        labels = inputs.clone()
+        # We sample a few tokens in each sequence for masked-LM training (with probability args.mlm_probability defaults to 0.15 in Bert/RoBERTa)
+
+        probability_matrix = mask_labels
+
+        special_tokens_mask = [
+            self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True)
+            for val in labels.tolist()
+        ]
+        probability_matrix.masked_fill_(
+            torch.tensor(special_tokens_mask, dtype=torch.bool), value=0.0
+        )
+        if self.tokenizer._pad_token is not None:
+            padding_mask = labels.eq(self.tokenizer.pad_token_id)
+            probability_matrix.masked_fill_(padding_mask, value=0.0)
+
+        masked_indices = probability_matrix.bool()
+        labels[~masked_indices] = -100  # We only compute loss on masked tokens
+
+        # @HERE everything is masked unlike in the original implementation!
+        indices_replaced = masked_indices
+        inputs[indices_replaced] = self.tokenizer.convert_tokens_to_ids(
+            self.tokenizer.mask_token
+        )
+
+        return inputs, labels
 
 
 def tokenize_corpus(examples):
@@ -137,7 +174,7 @@ def chunk_corpus(examples, chunk_size=512):
 def view_span_masks(masked_dataset, tokenizer, index=0):
     labels = masked_dataset["labels"][index].numpy()
     labels = [x for x in labels if x > 0]
-    label_string = tokenizer.decode(labels[:7], skip_special_tokens=False)
+    label_string = tokenizer.decode(labels[:12], skip_special_tokens=False)
     return label_string
 
 
