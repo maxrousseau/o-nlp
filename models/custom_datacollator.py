@@ -179,7 +179,6 @@ def view_span_masks(masked_dataset, tokenizer, index=0):
 
 
 def test_case():
-
     # let's first create a dummy dataset
     dataset = Dataset.load_from_disk("../tmp/bin/train")
     dataset = dataset.remove_columns(
@@ -211,35 +210,13 @@ def test_case():
     # @HERE :: stop, redo above code but adapt for 512 token chunks of the training dataset with questions for now?
     # done :: whole word masking is OK : each mask replaces a whole word (not a subword),
 
-    # @HERE :: now we want to be able to mask a continuous span
+    # @HERE :: now we want to be able to mask a continuous span @DONE!!
+    # next, I need to figure out a way to parse sentences which are candidate for masking rather than just doing it
+    # randmoly... basically I can replace 'random.shuffle(cand_indexes)' by a function which calls a sentence classifier!
 
     # ... and then begin implementation of the span datacollator which should be a simple modification of the call
     # function from the whole word mask collator
 
-    tensor = tokenizer(
-        dummy_ds["text"],
-        max_length=32,
-        truncation=True,
-        padding="max_length",
-        return_tensors="pt",
-    )
-    print(tensor)
-    print(type(tensor))
-    print(len(tensor))
-    print(tensor[0])
 
-    output = collator([tensor[i] for i in range(2)])
-
-    # decode to visualize mask
-    masked_output = tokenizer.decode(output[0])
-
-    # start trying to modify above
-    # print("{}\n{}".format(test_string, masked_output))
-
-    # go through the HF tutorial and colab -- https://huggingface.co/learn/nlp-course/chapter7/3?fw=pt
-    # it should not be too complicated to implement a custo collator/masking function but their code is too confusing
-    # for me to figure it out without the tutorial...
-
-
-if __name__ == "__main__":
-    test_case()
+# if __name__ == "__main__":
+#    test_case()
