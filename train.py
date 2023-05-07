@@ -15,6 +15,8 @@ from transformers import get_scheduler, DataCollatorForSeq2Seq, default_data_col
 from accelerate import Accelerator
 from accelerate.utils import ProjectConfiguration
 
+from sentence_transformers.losses import CosineSimilarityLoss
+
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -1042,12 +1044,31 @@ class EvaluateT5(BaseTester):
         )
 
 
-class Setfit(BaseTrainer):
+class Setfit(SetFitTrainer):
     """ """
 
     def __init__(self, config):
-        super().__init__(config)
-        self.max_seq_length = config.max_seq_length
+        super().__init__(
+            model=config.model_checkpoint,
+            train_dataset=config.train_dataset,
+            eval_dataset=config.val_dataset,
+            loss_class=CosineSmilarityLoss,
+            metric="accuracy",
+            batch_size=16,
+            num_iterations=20,
+            num_epochs=config.n_epochs,
+            seed=config.seed,
+        )
+        self.max_length = config.max_seq_length
+        self.name = config.name
 
-    def __call__():
-        None
+    def save_model(self, path):
+        """basic model saving where the path is overwrote if"""
+        if os.path.isfile(path):
+            shutil.rmtree(path)
+        self.model._save_pretrained(path=path)
+
+    def __call__(self):
+        self.train(max_length=self.max_length)
+        metrics = self.evaluate()
+        logger.info("Classifier {}".format(metrics["accuracy"]))
