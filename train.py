@@ -1050,7 +1050,7 @@ class Setfit(SetFitTrainer):
 
     def __init__(self, config):
         super().__init__(
-            model=config.model_checkpoint,
+            model=config.model,
             train_dataset=config.train_dataset,
             eval_dataset=config.val_dataset,
             loss_class=CosineSimilarityLoss,
