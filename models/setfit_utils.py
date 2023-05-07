@@ -1,7 +1,12 @@
 import random
 
 from dataclasses import dataclass
-from typing import Any
+
+from typing import List, Optional, Union, Any
+
+import torch
+
+from accelerate import Accelerator
 
 from datasets import Dataset
 
@@ -101,6 +106,78 @@ def make_classification_datset(dataset):
     return ds
 
 
+class SetfitModelAccelerate(SetFitModel):
+    """simply modify fit function to incorporate accelerate for mixed precision training"""
+
+    def fit(
+        self,
+        x_train: List[str],
+        y_train: Union[List[int], List[List[int]]],
+        num_epochs: int,
+        batch_size: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        body_learning_rate: Optional[float] = None,
+        l2_weight: Optional[float] = None,
+        max_length: Optional[int] = None,
+        show_progress_bar: Optional[bool] = None,
+    ) -> None:
+        if self.has_differentiable_head:  # train with pyTorch
+            device = self.model_body.device
+            self.model_body.train()
+            self.model_head.train()
+
+            accelerator = Accelerator(mixed_precision="fp16")
+
+            dataloader = self._prepare_dataloader(
+                x_train, y_train, batch_size, max_length
+            )
+            criterion = self.model_head.get_loss_fn()
+            optimizer = self._prepare_optimizer(
+                learning_rate, body_learning_rate, l2_weight
+            )
+            scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer, step_size=5, gamma=0.5
+            )
+
+            (
+                self.model,
+                self.dataloader,
+                criterion,
+                scheduler,
+                optimizer,
+            ) = accelerator.prepare(
+                self.model, self.dataloader, criterion, optimizer, scheduler
+            )
+
+            for epoch_idx in trange(
+                num_epochs, desc="Epoch", disable=not show_progress_bar
+            ):
+                for batch in dataloader:
+                    features, labels = batch
+                    optimizer.zero_grad()
+
+                    # to model's device
+                    features = {k: v.to(device) for k, v in features.items()}
+                    labels = labels.to(device)
+
+                    outputs = self.model_body(features)
+                    if self.normalize_embeddings:
+                        outputs = torch.nn.functional.normalize(outputs, p=2, dim=1)
+                    outputs = self.model_head(outputs)
+                    logits = outputs["logits"]
+
+                    loss = criterion(logits, labels)
+                    loss.backward()
+                    optimizer.step()
+
+                scheduler.step()
+        else:  # train with sklearn
+            embeddings = self.model_body.encode(
+                x_train, normalize_embeddings=self.normalize_embeddings
+            )
+            self.model_head.fit(embeddings, y_train)
+
+
 def setup_setfit_training(train_path, val_path, config):
     spacy_nlp = spacy.load("en_core_web_sm")
     # begin by setting up the dataset for sentence classification
@@ -121,7 +198,7 @@ def setup_setfit_training(train_path, val_path, config):
     config.val_dataset = make_classification_datset(val_set)
 
     # @HERE :: customize the setfit trainer class to fit with the rest of the codebase
-    config.model = SetFitModel.from_pretrained(config.model_checkpoint)
+    config.model = SetfitModelAccelerate.from_pretrained(config.model_checkpoint)
     return config
 
     # trainer = SetFitTrainer(
