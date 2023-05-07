@@ -17,6 +17,8 @@ from accelerate.utils import ProjectConfiguration
 
 from sentence_transformers.losses import CosineSimilarityLoss
 
+from setfit import SetFitTrainer
+
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -26,7 +28,6 @@ from datasets import Dataset
 import wandb
 
 
-# @TODO
 class BaseTester:
     """Tester base class, inference only"""
 
@@ -1052,15 +1053,21 @@ class Setfit(SetFitTrainer):
             model=config.model_checkpoint,
             train_dataset=config.train_dataset,
             eval_dataset=config.val_dataset,
-            loss_class=CosineSmilarityLoss,
+            loss_class=CosineSimilarityLoss,
             metric="accuracy",
             batch_size=16,
+            learning_rate=config.lr,
             num_iterations=20,
             num_epochs=config.n_epochs,
             seed=config.seed,
         )
-        self.max_length = config.max_seq_length
+        self.max_length = config.max_length
         self.name = config.name
+
+        FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
+        logging.basicConfig(format=FORMAT)
+        self.logger = logging.getLogger("trainer")
+        self.logger.setLevel(logging.DEBUG)  # change level if debug or not
 
     def save_model(self, path):
         """basic model saving where the path is overwrote if"""
@@ -1069,6 +1076,8 @@ class Setfit(SetFitTrainer):
         self.model._save_pretrained(path=path)
 
     def __call__(self):
-        self.train(max_length=self.max_length)
-        metrics = self.evaluate()
-        logger.info("Classifier {}".format(metrics["accuracy"]))
+        # self.train(max_length=self.max_length)
+        # metrics = self.evaluate()
+
+        # self.logger.info("Classifier {}".format(metrics["accuracy"]))
+        self.logger.info("initialization OK")

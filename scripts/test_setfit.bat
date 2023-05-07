@@ -1,0 +1,11 @@
+python main.py^
+ --name="setfit-testing"^
+ --lr=2e-5^
+ --epochs=1^
+ --model_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
+ --train_dataset="./tmp/bin/train"^
+ --val_dataset="./tmp/bin/val"^
+ --max_seq_len=256^
+ --seed=0^
+ --runmode="train-classifier"^
+ --savedir="./test_path"^

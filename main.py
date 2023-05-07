@@ -2,7 +2,7 @@
 import os
 import logging
 
-from models import t5_utils, bert_utils, bart_utils
+from models import t5_utils, bert_utils, bart_utils, setfit_utils
 
 from train import *
 
@@ -24,6 +24,7 @@ runmode = [
     "bert-finetune",
     "bert-squad-finetune",
     "bert-evaluate",
+    "train-classifier",
 ]
 
 flags.DEFINE_string(
@@ -216,6 +217,21 @@ def main(argv):
         config = t5_utils.setup_pretrain_t5(train_ds_path, config)
         pretrainer = PretrainT5(config)
         pretrainer()
+    elif runmode == "train-classifier":
+        config = setfit_utils.SFCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = setfit_utils.setup_setfit_training(train_ds_path, val_ds_path, config)
+        trainer = Setfit(config)
+        trainer()
+
     else:
         None
 
