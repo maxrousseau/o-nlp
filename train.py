@@ -1074,7 +1074,7 @@ class Setfit(SetFitTrainer):
         """basic model saving where the path is overwrote if"""
         if os.path.isfile(path):
             shutil.rmtree(path)
-        self.model._save_pretrained(path=path)
+        self.model._save_pretrained(save_directory=path)
 
     def __call__(self):
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
