@@ -1076,8 +1076,14 @@ class Setfit(SetFitTrainer):
         self.model._save_pretrained(path=path)
 
     def __call__(self):
-        # self.train(max_length=self.max_length)
-        # metrics = self.evaluate()
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+        save_path = os.path.abspath(
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
 
-        # self.logger.info("Classifier {}".format(metrics["accuracy"]))
-        self.logger.info("initialization OK")
+        self.train(max_length=self.max_length)
+        metrics = self.evaluate()
+        self.save_model(save_path)
+        self.logger.info(
+            "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
+        )
