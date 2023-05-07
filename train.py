@@ -1061,6 +1061,7 @@ class Setfit(SetFitTrainer):
             num_epochs=config.n_epochs,
             seed=config.seed,
         )
+        self.checkpoint_savedir = config.checkpoint_savedir
         self.max_length = config.max_length
         self.name = config.name
 
