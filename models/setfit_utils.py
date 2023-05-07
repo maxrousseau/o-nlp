@@ -105,8 +105,8 @@ def setup_setfit_training(train_path, val_path, config):
     spacy_nlp = spacy.load("en_core_web_sm")
     # begin by setting up the dataset for sentence classification
 
-    train_dataset = Dataset.load_from_disk(train_path).select(range(4))
-    val_dataset = Dataset.load_from_disk(val_path).select(range(4))
+    train_dataset = Dataset.load_from_disk(train_path)
+    val_dataset = Dataset.load_from_disk(val_path)
 
     # sentences, add a list of sentences
     train_dataset = get_sentence_list(train_dataset, parser=spacy_nlp)
