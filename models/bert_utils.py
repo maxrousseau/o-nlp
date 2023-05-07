@@ -3,7 +3,6 @@
 ###############################################################################
 #                               BERT-like utils                               #
 ###############################################################################
-import os
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -12,10 +11,6 @@ import collections
 import numpy as np
 
 from tqdm.auto import tqdm
-
-import torch
-from torch.optim import AdamW
-from torch.utils.data import DataLoader
 
 from transformers import (
     AutoTokenizer,

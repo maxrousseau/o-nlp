@@ -1,15 +1,39 @@
 import random
-import torch
 from datasets import Dataset
+from dataclasses import dataclass
 
 from tqdm.auto import tqdm
 
 import spacy
 
 
-nlp = spacy.load("en_core_web_sm")
+@dataclass
+class SFCFG:
+    name: str = "setfit-default"
+    lr: float = 2e-5
+    n_epochs: int = 1
+    lr_scheduler: bool = False
+    model_checkpoint: str = ""
+    tokenizer_checkpoint: str = ""
+    checkpoint_savedir: str = "./setfit-ckpt"
+    max_length: int = 256
+    padding: str = "max_length"
+    seed: int = 0
 
-# begin by setting up the dataset for sentence classification
+    train_dataset: Dataset = None
+    val_dataset: Dataset = None
+    test_dataset: Dataset = None
+
+    val_batches: Any = None
+    train_batches: Any = None
+    test_batches: Any = None
+
+    model: Any = None
+    tokenizer: Any = None
+    runmode: str = None
+
+    # TBD add a print/export function to the config when we save model...
+    # def __repr__() -> str
 
 
 def get_answer_sentence(example):
@@ -38,11 +62,11 @@ def get_answer_sentence(example):
     return example
 
 
-def get_sentence_list(dataset):
+def get_sentence_list(dataset, parser=None):
     sent_col = []
     for i in tqdm(range(len(dataset))):
         c = dataset["context"][i]
-        c = nlp(c)
+        c = parser(c)
         sentences = []
         for s in c.sents:
             sentences.append(s.text)
@@ -72,51 +96,44 @@ def make_classification_datset(dataset):
     return ds
 
 
-train_dataset = Dataset.load_from_disk(
-    "/content/drive/MyDrive/onlp/oqa_v1.0_shuffled_split/bin/train"
-)
-val_dataset = Dataset.load_from_disk(
-    "/content/drive/MyDrive/onlp/oqa_v1.0_shuffled_split/bin/val"
-)
+def setup_setfit_training(train_path, val_path, config):
+    spacy_nlp = spacy.load("en_core_web_sm")
+    # begin by setting up the dataset for sentence classification
 
-# sentences, add a list of sentences
-train_dataset = get_sentence_list(train_dataset)
-val_dataset = get_sentence_list(val_dataset)
+    train_dataset = Dataset.load_from_disk(train_path)
+    val_dataset = Dataset.load_from_disk(val_path)
 
-# create answer sent and non-answer sent dataset
-train_set = train_dataset.map(get_answer_sentence)
-val_set = val_dataset.map(
-    get_answer_sentence
-)  # BUG some None values for answer sentence given that they are over
-# two sentences
+    # sentences, add a list of sentences
+    train_dataset = get_sentence_list(train_dataset, parser=spacy_nlp)
+    val_dataset = get_sentence_list(val_dataset, parser=spacy_nlp)
 
-cls_train_dataset = make_classification_datset(train_set)
-cls_val_dataset = make_classification_datset(val_set)
-# read the setfit blog and paper, take notes
+    # create answer sent and non-answer sent dataset
+    train_set = train_dataset.map(get_answer_sentence)
+    val_set = val_dataset.map(get_answer_sentence)
+    # BUG some None values for answer sentence given that they are over two sentences -- discard if so
 
+    config.train_dataset = make_classification_datset(train_set)
+    config.val_dataset = make_classification_datset(val_set)
 
-# even simpler! perform the contrastive learning with PubmedBERT on the following:
-# question + relevant answer sent vs question + irrelevant answer sent
+    # @HERE :: customize the setfit trainer class to fit with the rest of the codebase
+    config.model = SetFitModel.from_pretrained(config.model_checkpoint)
+    return config
 
-biomodel = SetFitModel.from_pretrained(
-    "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
-)  # NICE
-
-trainer = SetFitTrainer(
-    model=biomodel,
-    train_dataset=cls_train_dataset,
-    eval_dataset=cls_val_dataset,
-    loss_class=CosineSimilarityLoss,
-    metric="accuracy",
-    batch_size=16,
-    num_iterations=20,  # The number of text pairs to generate for contrastive learning
-    num_epochs=1,  # The number of epochs to use for contrastive learning
-    column_mapping={
-        "text": "text",
-        "label": "label",
-    },  # Map dataset columns to text/label expected by trainer
-)
-
-# Train and evaluate
-trainer.train()
-metrics = trainer.evaluate()
+    # trainer = SetFitTrainer(
+    #     model=biomedl,
+    #     train_dataset=cls_train_dataset,
+    #     eval_dataset=cls_val_dataset,
+    #     loss_class=CosineSimilarityLoss,
+    #     metric="accuracy",
+    #     batch_size=16,
+    #     num_iterations=20,  # The number of text pairs to generate for contrastive learning
+    #     num_epochs=1,  # The number of epochs to use for contrastive learning
+    #     column_mapping={
+    #         "text": "text",
+    #         "label": "label",
+    #     },  # Map dataset columns to text/label expected by trainer
+    # )
+    #
+    # # Train and evaluate
+    # trainer.train()
+    # metrics = trainer.evaluate()

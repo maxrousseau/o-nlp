@@ -1040,3 +1040,14 @@ class EvaluateT5(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
+
+
+class Setfit(BaseTrainer):
+    """ """
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_seq_length = config.max_seq_length
+
+    def __call__():
+        None
