@@ -1055,7 +1055,7 @@ class Setfit(SetFitTrainer):
             eval_dataset=config.val_dataset,
             loss_class=CosineSimilarityLoss,
             metric="accuracy",
-            batch_size=8,
+            batch_size=12,
             learning_rate=config.lr,
             num_iterations=20,
             num_epochs=config.n_epochs,
