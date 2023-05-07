@@ -224,7 +224,6 @@ def main(argv):
             n_epochs=FLAGS.epochs,
             model_checkpoint=FLAGS.model_checkpoint,
             checkpoint_savedir=FLAGS.savedir,
-            checkpoint_savedir=FLAGS.savedir,
             max_length=FLAGS.max_seq_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
