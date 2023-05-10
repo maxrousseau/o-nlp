@@ -158,7 +158,7 @@ def replace_items(item, i, start, end, value):
 
 def find_offset(offset_mapping, k, idx):
     for p, i in enumerate(offset_mapping):
-        if i[k] == idx:
+        if (i[0] + i[1]) != 0 and i[k] == idx:
             return p
 
 
@@ -198,16 +198,17 @@ def tokenize_question_context(example):
 
     mask_mappings = [0] * 512
     num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
-    # num_question_tokens = end_question_mapping - start_question_mapping
+    num_question_tokens = end_question_mapping - start_question_mapping
+
     mask_mappings = (
         mask_mappings[:start_sentence_mapping]
-        + [1] * num_sentence_tokens
-        + mask_mappings[end_sentence_mapping:]
+        + [1] * (num_sentence_tokens + 1)
+        + mask_mappings[end_sentence_mapping + 1 :]
     )
     mask_mappings = (
-        mask_mappings[:start_sentence_mapping]
-        + [1] * num_sentence_tokens
-        + mask_mappings[end_sentence_mapping:]
+        mask_mappings[:start_question_mapping]
+        + [1] * (num_question_tokens + 1)
+        + mask_mappings[end_question_mapping + 1 :]
     )
     assert len(mask_mappings) == 512
 
@@ -300,6 +301,13 @@ def test_case():
         tokenize_question_context, batched=False, remove_columns=dataset.column_names
     )
     # @HERE :: verify that the masking_mappings are properly applied to the target sentence and the question
+    # apply mappings to question and to sentence then verify that they match with the ones from the dataset
+
+    input_ids = torch.Tensor(tokenized_dataset["input_ids"][0]).int()
+    mask = torch.Tensor(tokenized_dataset["mask_mappings"][0]).int()
+    mask = mask.bool()
+
+    targets = torch.masked_select(input_ids, mask).numpy()
 
 
 def DataCollatorMageTuning():
