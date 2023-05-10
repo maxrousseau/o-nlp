@@ -1,4 +1,5 @@
 from datasets import Dataset
+import datasets
 from transformers import (
     DataCollatorForWholeWordMask,
     AutoTokenizer,
@@ -18,8 +19,6 @@ import random
 tokenizer = AutoTokenizer.from_pretrained(
     "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
 )
-
-dataset = Dataset.load_from_disk("../tmp/bin/train")
 
 
 class DataCollatorForWholeWordSpan(DataCollatorForWholeWordMask):
@@ -150,6 +149,73 @@ def tokenize_corpus(examples):
     return result
 
 
+def replace_items(item, i, start, end, value):
+    if i >= start and i <= end:
+        return value
+    else:
+        return item
+
+
+def find_offset(offset_mapping, k, idx):
+    for p, i in enumerate(offset_mapping):
+        if i[k] == idx:
+            return p
+
+
+# @HERE --- begin figuring out the maskable_mappings
+# @BUG --- questions will need to be of length max 128tokens and corpus will need to be chunked into 384
+def tokenize_question_context(example):
+    inputs = tokenizer(
+        example["question"],
+        example["context"],
+        max_length=512,
+        truncation=True,
+        padding="max_length",
+        return_offsets_mapping=True,
+    )
+
+    if tokenizer.is_fast:
+        inputs["word_ids"] = [i for i in range(len(inputs["input_ids"]))]
+
+    inputs["mask_mappings"] = []
+
+    start_pos_sentence = example["sentence_start"]
+    end_pos_sentence = start_pos_sentence + len(example["answer_sentence"])
+
+    start_pos_question = 0
+    end_pos_question = len(example["question"])
+
+    start_sentence_mapping = find_offset(
+        inputs["offset_mapping"], 0, start_pos_sentence
+    )
+
+    end_sentence_mapping = find_offset(inputs["offset_mapping"], 1, end_pos_sentence)
+
+    start_question_mapping = find_offset(
+        inputs["offset_mapping"], 0, start_pos_question
+    )
+    end_question_mapping = find_offset(inputs["offset_mapping"], 1, end_pos_question)
+
+    mask_mappings = [0] * 512
+    num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
+    # num_question_tokens = end_question_mapping - start_question_mapping
+    mask_mappings = (
+        mask_mappings[:start_sentence_mapping]
+        + [1] * num_sentence_tokens
+        + mask_mappings[end_sentence_mapping:]
+    )
+    mask_mappings = (
+        mask_mappings[:start_sentence_mapping]
+        + [1] * num_sentence_tokens
+        + mask_mappings[end_sentence_mapping:]
+    )
+    assert len(mask_mappings) == 512
+
+    inputs["mask_mappings"].append(mask_mappings)
+
+    return inputs
+
+
 def chunk_corpus(examples, chunk_size=512):
     """chunking the corpus for pretraining"""
 
@@ -178,12 +244,31 @@ def view_span_masks(masked_dataset, tokenizer, index=0):
     return label_string
 
 
+def get_answer_sentence(dataset):
+    ans = []
+    ans_pos = []
+    for example in dataset:
+        sentences = example["context"].split(". ")
+        for s in sentences:
+            if example["answers"]["text"][0] in s:
+                ans.append(s)
+                ans_pos.append(example["context"].find(s))
+
+    dset_ans = datasets.Dataset.from_dict(
+        {"answer_sentence": ans, "sentence_start": ans_pos}
+    )
+    dataset = datasets.concatenate_datasets([dataset, dset_ans], axis=1)
+    return dataset
+
+
 def test_case():
     # let's first create a dummy dataset
-    dataset = Dataset.load_from_disk("../tmp/bin/train")
-    dataset = dataset.remove_columns(
-        ["answers", "answer_sentence", "topic", "reference", "question"]
-    )
+    dataset = Dataset.load_from_disk("../tmp/bin/train").select(range(10))
+    dataset = dataset.remove_columns(["answer_sentence"])
+    dataset = get_answer_sentence(dataset)
+    # dataset = dataset.remove_columns(
+    #    ["answers", "answer_sentence", "topic", "reference", "question"]
+    # )
     dataset = dataset.rename_column("context", "text")
 
     # so we can tokenize this using our pretrained bert-like tokenizer, we don't truncate the input as we will split it
@@ -207,16 +292,43 @@ def test_case():
 
     span_dataset = span_collator(chunked_dataset)
 
-    # @HERE :: stop, redo above code but adapt for 512 token chunks of the training dataset with questions for now?
-    # done :: whole word masking is OK : each mask replaces a whole word (not a subword),
-
-    # @HERE :: now we want to be able to mask a continuous span @DONE!!
-    # next, I need to figure out a way to parse sentences which are candidate for masking rather than just doing it
     # randmoly... basically I can replace 'random.shuffle(cand_indexes)' by a function which calls a sentence classifier!
 
     # ... and then begin implementation of the span datacollator which should be a simple modification of the call
     # function from the whole word mask collator
+    tokenized_dataset = dataset.map(
+        tokenize_question_context, batched=False, remove_columns=dataset.column_names
+    )
+    # @HERE :: verify that the masking_mappings are properly applied to the target sentence and the question
 
 
-# if __name__ == "__main__":
-#    test_case()
+def DataCollatorMageTuning():
+    """
+        modify from the span masking collator
+
+    #@HERE - STEP 1 preprocessing the questions and text chunks identify maskable sequences
+        I need to add a column for maskable sequences [0, 1, 2] # 0 no mask, 1 target sentence, 2 question :: tokenize
+        sample dataset above with question and context to identify how to apply this...
+
+        Algo:
+        for each sample:
+
+            if mask_question:
+                    maskable_ids = rand(1 or 2) (convert to bool matrix)
+            else:
+                    maskable_ids = 1 (convert to bool matrix)
+
+        -> cand_word_ids = get the word_ids of of maskable_ids
+        -> span_length = poisson(12)
+
+        if span_length >= len_cand_word_ids:
+            while span_len >= len_cand_word_ids:
+                    span_length = poisson(12)
+
+        -> cand_start_ids = cand_word_ids[:span_length]
+        -> shuffle(cand_start_ids)
+        -> select mask word ids (see code above)
+
+        endfor
+
+    """
