@@ -300,14 +300,22 @@ def test_case():
     tokenized_dataset = dataset.map(
         tokenize_question_context, batched=False, remove_columns=dataset.column_names
     )
-    # @HERE :: verify that the masking_mappings are properly applied to the target sentence and the question
+    # verify that the masking_mappings are properly applied to the target sentence and the question
     # apply mappings to question and to sentence then verify that they match with the ones from the dataset
 
     input_ids = torch.Tensor(tokenized_dataset["input_ids"][0]).int()
     mask = torch.Tensor(tokenized_dataset["mask_mappings"][0]).int()
     mask = mask.bool()
 
+    # np.array([0, 1, 1, 0, 0, 2, 2])
+    # (a == 1).astype(int)
+
     targets = torch.masked_select(input_ids, mask).numpy()
+
+    # @HERE - apply Bool based mask based on the value 1 or 2
+
+    # after we get the maskable ids, determine possible start points by looking at lenght of the list - span
+    # length. then randomize that sublist, sample the mask tokens and apply masks as in the whole word span collator.
 
 
 def DataCollatorMageTuning():
