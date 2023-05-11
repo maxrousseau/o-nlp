@@ -317,6 +317,9 @@ def test_case():
     # after we get the maskable ids, determine possible start points by looking at lenght of the list - span
     # length. then randomize that sublist, sample the mask tokens and apply masks as in the whole word span collator.
 
+    # @NOTE: final format for DataCollatorMageTuning -> dataset {question, chunk, } -> tokenized_dataset { "input_ids", "mask_mapping",
+    # "attention_mask", "word_ids", "token_type_ids" }
+
 
 def DataCollatorMageTuning():
     """
