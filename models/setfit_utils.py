@@ -149,7 +149,7 @@ class SetfitModelAccelerate(SetFitModel):
                 self.model, self.dataloader, criterion, optimizer, scheduler
             )
 
-            for epoch_idx in trange(
+            for epoch_idx in range(
                 num_epochs, desc="Epoch", disable=not show_progress_bar
             ):
                 for batch in dataloader:

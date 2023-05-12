@@ -1,8 +1,19 @@
 import torch
 
+import datasets
+from datasets import Dataset
+
+from typing import Any
+
+from transformers import AutoTokenizer
+
+import json
+
 from dataclasses import dataclass
 
-from ..models import custom_datacollator
+from setfit import SetFitModel
+
+# from ..models import custom_datacollator
 
 """
 given a corpus, a QA dataset and a sentence classifier: generate a masked span filling dataset
@@ -19,40 +30,137 @@ Do for 100 papers from the corpus and then scale when cleaned up. Allow to save 
 
 
 @dataclass
-class MageDatasetGenerator:
-    corpus = None
-    qa_dataset = None
-    sentence_classifier = None
+class TadamDatasetGenerator:
+    corpus: datasets.arrow_dataset.Dataset
+    qa_dataset: datasets.arrow_dataset.Dataset
+    tokenizer: Any = None  # change to HF tokenizer
+    sentence_classifier: Any = None  # change to HF classifier!
 
-    _lambda = None
+    _lambda: int = 0
 
-    max_context_length = 384
-    max_question_length = 128
-    max_sequence_length = 512
+    max_context_length: int = 384
+    max_question_length: int = 128
+    max_sequence_length: int = 512
 
-    mask_sentence_only = True
-
-    tokenizer = None
+    mask_sentence_only: bool = True
 
     target_dataset = {
-        "id": [],
         "question": [],
         "text": [],
         "target": [],
     }
 
-    def chunk_corpus(self):
-        """ """
-        self.chunks
-        None
+    def tokenize_corpus(self, examples):
+        """tokenize the pretraining corpora"""
+        inputs = self.tokenizer(examples["text"], padding=False, truncation=False)
+        if self.tokenizer.is_fast:
+            inputs["word_ids"] = [
+                inputs.word_ids(i) for i in range(len(inputs["input_ids"]))
+            ]
+        return inputs
 
-    def find_targets(self):
-        None
+    def chunk_corpus(self, examples):
+        """chunking the corpus for pretraining"""
 
-    def process_chunks(self):
-        for chunk in self.chunks:
-            self.find_targets(chunk, self.qa_dataset["question"], self._lambda)
+        chunk_size = self.max_context_length
+
+        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+
+        # We drop the last chunk if it's smaller than chunk_size
+        total_length = (total_length // chunk_size) * chunk_size
+
+        # Split by chunks of max_len
+        result = {
+            k: [t[i : i + chunk_size] for i in range(0, total_length, chunk_size)]
+            for k, t in concatenated_examples.items()
+        }
+        # Create a new labels column
+
+        result["labels"] = result["input_ids"].copy()
+        # we need this when we corrupt our input_ids
+        return result
+
+    def find_targets(self, sentences):
+        for s in sentences:
+            for q in self.qa_dataset["question"]:
+                query = " ".join((q, s))
+                print(query)
+                query2 = " ".join(
+                    (
+                        q,
+                        "malocclusion tends to get worse for dolychocephalic patients with a high mp-sn angle.",
+                    )
+                )
+                tokenized_query = self.tokenizer(
+                    query, max_length=256, padding="max_length", truncation=True
+                )
+                # @HERE :: implement and test the sentence classifier
+                is_relevant = self.sentence_classifier([query, query2])
+                print(is_relevant.numpy())  # is relevant if == 1
+                break
+                if is_relevant:
+                    self.target_dataset["question"] = q
+                    self.target_dataset["text"] = " ".join(sentences)
+                    self.target_dataset["target"] = s
+            break
+
+    def process_chunks(self, chunks):
+        for chunk in chunks:
+            chunk = self.parser(
+                self.tokenizer.decode(chunk["input_ids"], skip_special_tokens=True)
+            )
+            chunk_sentences = [s.text for s in chunk.doc.sents]
+            self.find_targets(chunk_sentences)
+            break
+            # self.find_targets(chunk, self.qa_dataset["question"], self._lambda)
 
     def __call__(self):
         # returns the tokenized/collated mask_dataset { "id", "text", "labels", "word_ids", ...}
-        None
+
+        tokenized_corpus = self.corpus.map(
+            self.tokenize_corpus,
+            batched=True,
+            remove_columns=["text", "article_id", "page"],
+        )
+
+        chunked_corpus = tokenized_corpus.map(self.chunk_corpus, batched=True)
+
+        import spacy
+
+        self.parser = spacy.load("en_core_web_sm")
+        self.process_chunks(chunked_corpus)
+
+        return chunked_corpus
+
+
+def test_case():
+
+    # from ..load_data import load_corpus
+
+    corpus = load_corpus("../tmp/angle_orthodontist_corpus.json")
+    corpus = Dataset.from_dict(
+        {
+            "article_id": [x.get("article_id") for x in corpus],
+            "page": [x.get("page") for x in corpus],
+            "text": [x.get("text") for x in corpus],
+        }
+    )
+    corpus = corpus.select(range(100))
+    oqa = Dataset.load_from_disk("../tmp/bin/train")
+
+    sentence_classifier = SetFitModel.from_pretrained(
+        "../tmp/setfit-pubmedbert/setfit-pubmedbert-07-05-2023-85vacc"
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+    )
+
+    # chunk it up
+    tadam = TadamDatasetGenerator(
+        corpus=corpus,
+        qa_dataset=oqa,
+        sentence_classifier=sentence_classifier,
+        tokenizer=tokenizer,
+    )
+    test_c = tadam()
