@@ -5,6 +5,10 @@ from datasets import Dataset
 
 from typing import Any
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+import numpy as np
+
 from transformers import AutoTokenizer
 
 from tqdm.auto import tqdm
@@ -46,6 +50,8 @@ class TadamDatasetGenerator:
 
     mask_sentence_only: bool = True
 
+    queries = {"target": [], "question": [], "qs": []}
+
     target_dataset = {
         "question": [],
         "text": [],
@@ -84,24 +90,33 @@ class TadamDatasetGenerator:
         return result
 
     def find_targets(self, sentences):
-        queries = {"target": [], "question": [], "qs": []}
+
         text = " ".join(sentences)
         for s in tqdm(sentences):
-            self.qa_dataset.map(
-                lambda x: queries["qs"].append(" ".join((x["question"], s))),
-                batched=False,
-            )
-            for q in self.qa_dataset["question"]:
-                queries["qs"].append(" ".join((q, s)))
-                queries["question"].append(q)
-                queries["target"].append(s)
+            questions = self.qa_dataset["questions"]
+            tfidf_corpus = questions + [text]
 
-        is_relevant = self.sentence_classifier(queries["qs"])
+            vect = TfidfVectorizer(min_df=1, stop_words="english")
+            tfidf = vect.fit_transform(tfidf_corpus)
+            pairwise_similarity = tfidf * tfidf.T
+            sim_array = pairwise_similarity.toarray()
+            np.fill_diagonal(sim_array, np.nan)
+            max_idx = np.nanargmax(sim_array[-1])
+            max_val = sim_array[-1, max_idx]
+
+            if max_val > 0.2:
+                self.queries["qs"].append(" ".join((questions[max_idx], s)))
+                self.queries["question"].append(questions[max_idx])
+                self.queries["target"].append(s)
+                self.queries["text"].append(text)
+
+    def get_relevant_pairs(self):
+        is_relevant = self.sentence_classifier(self.queries["qs"])
         for i, rel in enumerate(is_relevant):
             if rel:
-                self.target_dataset["question"].append(queries["question"][i])
-                self.target_dataset["text"].append(text)
-                self.target_dataset["target"].append(queries["target"][i])
+                self.target_dataset["question"].append(self.queries["question"][i])
+                self.target_dataset["text"].append(self.queries["text"][i])
+                self.target_dataset["target"].append(self.queries["target"][i])
 
     def process_chunks(self, chunks):
         for chunk in tqdm(chunks):
@@ -110,7 +125,6 @@ class TadamDatasetGenerator:
             )
             chunk_sentences = [s.text for s in chunk.doc.sents]
             self.find_targets(chunk_sentences)
-            break
             # self.find_targets(chunk, self.qa_dataset["question"], self._lambda)
 
     def __call__(self):
@@ -128,6 +142,7 @@ class TadamDatasetGenerator:
 
         self.parser = spacy.load("en_core_web_sm")
         self.process_chunks(chunked_corpus)
+        self.get_relevant_pairs()
 
         return chunked_corpus
 
@@ -151,7 +166,7 @@ def test_case():
     oqa = Dataset.load_from_disk("../tmp/bin/train")
 
     sentence_classifier = SetfitModelAccelerate.from_pretrained(
-        "../tmp/setfit-pubmedbert/setfit-pubmedbert-07-05-2023-85vacc"
+        "../tmp/setfit-pubmedbert/setfit-pubmedbert-07-05-2023-85vacc", batch_size=16
     )
     tokenizer = AutoTokenizer.from_pretrained(
         "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
