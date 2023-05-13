@@ -7,6 +7,8 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
+from tqdm.auto import tqdm
+
 import json
 
 from dataclasses import dataclass
@@ -82,31 +84,27 @@ class TadamDatasetGenerator:
         return result
 
     def find_targets(self, sentences):
-        for s in sentences:
+        queries = {"target": [], "question": [], "qs": []}
+        text = " ".join(sentences)
+        for s in tqdm(sentences):
+            self.qa_dataset.map(
+                lambda x: queries["qs"].append(" ".join((x["question"], s))),
+                batched=False,
+            )
             for q in self.qa_dataset["question"]:
-                query = " ".join((q, s))
-                print(query)
-                query2 = " ".join(
-                    (
-                        q,
-                        "malocclusion tends to get worse for dolychocephalic patients with a high mp-sn angle.",
-                    )
-                )
-                tokenized_query = self.tokenizer(
-                    query, max_length=256, padding="max_length", truncation=True
-                )
-                # @HERE :: implement and test the sentence classifier
-                is_relevant = self.sentence_classifier([query, query2])
-                print(is_relevant.numpy())  # is relevant if == 1
-                break
-                if is_relevant:
-                    self.target_dataset["question"] = q
-                    self.target_dataset["text"] = " ".join(sentences)
-                    self.target_dataset["target"] = s
-            break
+                queries["qs"].append(" ".join((q, s)))
+                queries["question"].append(q)
+                queries["target"].append(s)
+
+        is_relevant = self.sentence_classifier(queries["qs"])
+        for i, rel in enumerate(is_relevant):
+            if rel:
+                self.target_dataset["question"].append(queries["question"][i])
+                self.target_dataset["text"].append(text)
+                self.target_dataset["target"].append(queries["target"][i])
 
     def process_chunks(self, chunks):
-        for chunk in chunks:
+        for chunk in tqdm(chunks):
             chunk = self.parser(
                 self.tokenizer.decode(chunk["input_ids"], skip_special_tokens=True)
             )
@@ -135,8 +133,11 @@ class TadamDatasetGenerator:
 
 
 def test_case():
+    import sys
 
-    # from ..load_data import load_corpus
+    sys.path.append("../")
+    from models.setfit_utils import SetfitModelAccelerate
+    from load_data import load_corpus
 
     corpus = load_corpus("../tmp/angle_orthodontist_corpus.json")
     corpus = Dataset.from_dict(
@@ -149,7 +150,7 @@ def test_case():
     corpus = corpus.select(range(100))
     oqa = Dataset.load_from_disk("../tmp/bin/train")
 
-    sentence_classifier = SetFitModel.from_pretrained(
+    sentence_classifier = SetfitModelAccelerate.from_pretrained(
         "../tmp/setfit-pubmedbert/setfit-pubmedbert-07-05-2023-85vacc"
     )
     tokenizer = AutoTokenizer.from_pretrained(
@@ -164,3 +165,7 @@ def test_case():
         tokenizer=tokenizer,
     )
     test_c = tadam()
+
+
+# if __name__ == "__main__":
+#    test_case()
