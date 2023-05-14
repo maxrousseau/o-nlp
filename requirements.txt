@@ -4,3 +4,6 @@ accelerate
 torch
 numpy
 tqdm
+setfit
+sentence_transformers
+spacy

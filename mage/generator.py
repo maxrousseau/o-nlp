@@ -17,8 +17,6 @@ import json
 
 from dataclasses import dataclass
 
-from setfit import SetFitModel
-
 # from ..models import custom_datacollator
 
 """
@@ -238,11 +236,11 @@ def test_case():
             "text": [x.get("text") for x in corpus],
         }
     )
-    corpus = corpus.select(range(100))
-    oqa = Dataset.load_from_disk("../tmp/bin/train")
+    corpus = corpus
+    oqa = Dataset.load_from_disk("../tmp/oqa_v1.0_shuffled_split/bin/train")
 
     sentence_classifier = SetfitModelAccelerate.from_pretrained(
-        "../tmp/setfit-pubmedbert/setfit-pubmedbert-07-05-2023-85vacc", batch_size=16
+        "../tmp/setfit-pubmedbert-07-05-2023", batch_size=16
     )
     tokenizer = AutoTokenizer.from_pretrained(
         "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
