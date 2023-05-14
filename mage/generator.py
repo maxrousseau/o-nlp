@@ -50,13 +50,9 @@ class TadamDatasetGenerator:
 
     mask_sentence_only: bool = True
 
-    queries = {"target": [], "question": [], "qs": []}
+    queries = {"target": [], "question": [], "qs": [], "text": []}
 
-    target_dataset = {
-        "question": [],
-        "text": [],
-        "target": [],
-    }
+    target_dataset = {"question": [], "text": [], "target": [], "target_start": []}
 
     def tokenize_corpus(self, examples):
         """tokenize the pretraining corpora"""
@@ -92,19 +88,20 @@ class TadamDatasetGenerator:
     def find_targets(self, sentences):
 
         text = " ".join(sentences)
-        for s in tqdm(sentences):
-            questions = self.qa_dataset["questions"]
-            tfidf_corpus = questions + [text]
+        questions = self.qa_dataset["question"]
+        tfidf_corpus = questions + [text]
 
-            vect = TfidfVectorizer(min_df=1, stop_words="english")
-            tfidf = vect.fit_transform(tfidf_corpus)
-            pairwise_similarity = tfidf * tfidf.T
-            sim_array = pairwise_similarity.toarray()
-            np.fill_diagonal(sim_array, np.nan)
-            max_idx = np.nanargmax(sim_array[-1])
-            max_val = sim_array[-1, max_idx]
+        vect = TfidfVectorizer(min_df=1, stop_words="english")
+        tfidf = vect.fit_transform(tfidf_corpus)
+        pairwise_similarity = tfidf * tfidf.T
+        sim_array = pairwise_similarity.toarray()
+        np.fill_diagonal(sim_array, np.nan)
 
-            if max_val > 0.2:
+        max_idx = np.nanargmax(sim_array[-1])
+        max_val = sim_array[-1, max_idx]
+
+        if max_val > 0.2:
+            for s in sentences:
                 self.queries["qs"].append(" ".join((questions[max_idx], s)))
                 self.queries["question"].append(questions[max_idx])
                 self.queries["target"].append(s)
@@ -116,6 +113,9 @@ class TadamDatasetGenerator:
             if rel:
                 self.target_dataset["question"].append(self.queries["question"][i])
                 self.target_dataset["text"].append(self.queries["text"][i])
+                self.target_dataset["target_start"].append(
+                    self.queries["text"][i].find(self.queries["target"][i])
+                )
                 self.target_dataset["target"].append(self.queries["target"][i])
 
     def process_chunks(self, chunks):
@@ -126,6 +126,69 @@ class TadamDatasetGenerator:
             chunk_sentences = [s.text for s in chunk.doc.sents]
             self.find_targets(chunk_sentences)
             # self.find_targets(chunk, self.qa_dataset["question"], self._lambda)
+
+    def find_offset(self, offset_mapping, k, idx):
+        for p, i in enumerate(offset_mapping):
+            if (i[0] + i[1]) != 0 and i[k] == idx:
+                return p
+
+    def mask_mapping(self, example):
+        """Here I need the the sentence start position in the context"""
+
+        inputs = self.tokenizer(
+            example["question"],
+            example["text"],
+            max_length=self.max_sequence_length,
+            truncation=True,
+            padding="max_length",
+            return_offsets_mapping=True,
+        )
+
+        if self.tokenizer.is_fast:
+            inputs["word_ids"] = [i for i in range(len(inputs["input_ids"]))]
+
+        inputs["mask_mappings"] = []
+
+        start_pos_sentence = example["target_start"]
+        end_pos_sentence = start_pos_sentence + len(example["target"])
+
+        start_pos_question = 0
+        end_pos_question = len(example["question"])
+
+        start_sentence_mapping = self.find_offset(
+            inputs["offset_mapping"], 0, start_pos_sentence
+        )
+
+        end_sentence_mapping = self.find_offset(
+            inputs["offset_mapping"], 1, end_pos_sentence
+        )
+
+        start_question_mapping = self.find_offset(
+            inputs["offset_mapping"], 0, start_pos_question
+        )
+        end_question_mapping = self.find_offset(
+            inputs["offset_mapping"], 1, end_pos_question
+        )
+
+        mask_mappings = [0] * 512
+        num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
+        num_question_tokens = end_question_mapping - start_question_mapping
+
+        mask_mappings = (
+            mask_mappings[:start_sentence_mapping]
+            + [1] * (num_sentence_tokens + 1)
+            + mask_mappings[end_sentence_mapping + 1 :]
+        )
+        mask_mappings = (
+            mask_mappings[:start_question_mapping]
+            + [1] * (num_question_tokens + 1)
+            + mask_mappings[end_question_mapping + 1 :]
+        )
+        assert len(mask_mappings) == 512
+
+        inputs["mask_mappings"].append(mask_mappings)
+
+        return inputs
 
     def __call__(self):
         # returns the tokenized/collated mask_dataset { "id", "text", "labels", "word_ids", ...}
@@ -142,9 +205,22 @@ class TadamDatasetGenerator:
 
         self.parser = spacy.load("en_core_web_sm")
         self.process_chunks(chunked_corpus)
+        print("{} possible masking targets".format(len(self.queries["question"])))
         self.get_relevant_pairs()
+        print(
+            "{} masking samples generated".format(len(self.target_dataset["question"]))
+        )
 
-        return chunked_corpus
+        self.target_dataset = Dataset.from_dict(self.target_dataset)
+        self.target_dataset.save_to_disk("tacoma-angle_oqa")
+
+        tokenized_mask_dataset = self.target_dataset.map(
+            self.mask_mapping,
+            batched=False,
+            remove_columns=self.target_dataset.column_names,
+        )
+
+        return tokenized_mask_dataset
 
 
 def test_case():
@@ -179,8 +255,11 @@ def test_case():
         sentence_classifier=sentence_classifier,
         tokenizer=tokenizer,
     )
-    test_c = tadam()
+    tadam()
 
 
-# if __name__ == "__main__":
-#    test_case()
+#    return tadam
+
+
+if __name__ == "__main__":
+    test_case()

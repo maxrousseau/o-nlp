@@ -321,7 +321,7 @@ def test_case():
     # "attention_mask", "word_ids", "token_type_ids" }
 
 
-def DataCollatorMageTuning():
+def DataCollatorMageTuning(DataCollatorForWholeWordMask):
     """
         modify from the span masking collator
 
