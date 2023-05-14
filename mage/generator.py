@@ -8,14 +8,24 @@ from typing import Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 import numpy as np
-
-from transformers import AutoTokenizer
-
+from collections.abc import Mapping
 from tqdm.auto import tqdm
-
-import json
-
+import random
 from dataclasses import dataclass
+from transformers.data.data_collator import _torch_collate_batch, tolist
+
+from transformers import (
+    DataCollatorForWholeWordMask,
+    AutoTokenizer,
+    BertTokenizer,
+    BertTokenizerFast,
+)
+import torch
+
+import warnings
+
+from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
+
 
 # from ..models import custom_datacollator
 
@@ -34,7 +44,7 @@ Do for 100 papers from the corpus and then scale when cleaned up. Allow to save 
 
 
 @dataclass
-class TadamDatasetGenerator:
+class TacomaDatasetGenerator:
     corpus: datasets.arrow_dataset.Dataset
     qa_dataset: datasets.arrow_dataset.Dataset
     tokenizer: Any = None  # change to HF tokenizer
@@ -125,69 +135,6 @@ class TadamDatasetGenerator:
             self.find_targets(chunk_sentences)
             # self.find_targets(chunk, self.qa_dataset["question"], self._lambda)
 
-    def find_offset(self, offset_mapping, k, idx):
-        for p, i in enumerate(offset_mapping):
-            if (i[0] + i[1]) != 0 and i[k] == idx:
-                return p
-
-    def mask_mapping(self, example):
-        """Here I need the the sentence start position in the context"""
-
-        inputs = self.tokenizer(
-            example["question"],
-            example["text"],
-            max_length=self.max_sequence_length,
-            truncation=True,
-            padding="max_length",
-            return_offsets_mapping=True,
-        )
-
-        if self.tokenizer.is_fast:
-            inputs["word_ids"] = [i for i in range(len(inputs["input_ids"]))]
-
-        inputs["mask_mappings"] = []
-
-        start_pos_sentence = example["target_start"]
-        end_pos_sentence = start_pos_sentence + len(example["target"])
-
-        start_pos_question = 0
-        end_pos_question = len(example["question"])
-
-        start_sentence_mapping = self.find_offset(
-            inputs["offset_mapping"], 0, start_pos_sentence
-        )
-
-        end_sentence_mapping = self.find_offset(
-            inputs["offset_mapping"], 1, end_pos_sentence
-        )
-
-        start_question_mapping = self.find_offset(
-            inputs["offset_mapping"], 0, start_pos_question
-        )
-        end_question_mapping = self.find_offset(
-            inputs["offset_mapping"], 1, end_pos_question
-        )
-
-        mask_mappings = [0] * 512
-        num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
-        num_question_tokens = end_question_mapping - start_question_mapping
-
-        mask_mappings = (
-            mask_mappings[:start_sentence_mapping]
-            + [1] * (num_sentence_tokens + 1)
-            + mask_mappings[end_sentence_mapping + 1 :]
-        )
-        mask_mappings = (
-            mask_mappings[:start_question_mapping]
-            + [1] * (num_question_tokens + 1)
-            + mask_mappings[end_question_mapping + 1 :]
-        )
-        assert len(mask_mappings) == 512
-
-        inputs["mask_mappings"].append(mask_mappings)
-
-        return inputs
-
     def __call__(self):
         # returns the tokenized/collated mask_dataset { "id", "text", "labels", "word_ids", ...}
 
@@ -210,15 +157,231 @@ class TadamDatasetGenerator:
         )
 
         self.target_dataset = Dataset.from_dict(self.target_dataset)
-        self.target_dataset.save_to_disk("tacoma-angle_oqa")
+        # self.target_dataset.save_to_disk("tacoma-angle_oqa") TODO implement a save/export function
+        # NOTE :: dataset generation is extremely slow... might need to figure out a way to quantize the model to speed
+        # it up. furthermore, the tfidf threshold should be estimated from the target dataset to be more
+        # reprensentative... test out for now then clean this up
+        return self.target_dataset
 
-        tokenized_mask_dataset = self.target_dataset.map(
-            self.mask_mapping,
-            batched=False,
-            remove_columns=self.target_dataset.column_names,
+
+def find_offset(offset_mapping, k, idx):
+    for p, i in enumerate(offset_mapping):
+        if (i[0] + i[1]) != 0 and i[k] == idx:
+            return p
+
+
+def mask_mapping(example, tokenizer, max_sequence_length=512):
+    """Here I need the the sentence start position in the context"""
+
+    inputs = tokenizer(
+        example["question"],
+        example["text"],
+        max_length=max_sequence_length,
+        truncation=True,
+        padding="max_length",
+        return_offsets_mapping=True,
+    )
+
+    if tokenizer.is_fast:
+        inputs["word_ids"] = [i for i in range(len(inputs["input_ids"]))]
+
+    inputs["mask_mappings"] = []
+
+    start_pos_sentence = example["target_start"]
+    end_pos_sentence = start_pos_sentence + len(example["target"])
+
+    start_pos_question = 0
+    end_pos_question = len(example["question"])
+
+    start_question_mapping = find_offset(
+        inputs["offset_mapping"], 0, start_pos_question
+    )
+    end_question_mapping = find_offset(inputs["offset_mapping"], 1, end_pos_question)
+
+    question_offset = end_question_mapping + 1  # sep token
+
+    start_sentence_mapping = (
+        find_offset(inputs["offset_mapping"][question_offset:], 0, start_pos_sentence)
+        + question_offset
+    )
+
+    end_sentence_mapping = (
+        find_offset(inputs["offset_mapping"][question_offset:], 1, end_pos_sentence)
+        + question_offset
+    )
+
+    mask_mappings = [0] * 512
+    num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
+    num_question_tokens = end_question_mapping - start_question_mapping
+
+    mask_mappings = (
+        mask_mappings[:start_sentence_mapping]
+        + [1] * (num_sentence_tokens + 1)
+        + mask_mappings[end_sentence_mapping + 1 :]
+    )
+    mask_mappings = (
+        mask_mappings[:start_question_mapping]
+        + [2] * (num_question_tokens + 1)
+        + mask_mappings[end_question_mapping + 1 :]
+    )
+    assert len(mask_mappings) == 512
+
+    inputs["mask_mappings"].append(mask_mappings)
+
+    return inputs
+
+
+def tokenize_tacoma(dataset, tokenizer):
+    tokenized_mask_dataset = dataset.map(
+        lambda example: mask_mapping(
+            example, tokenizer=tokenizer, max_sequence_length=512
+        ),
+        batched=False,
+        remove_columns=dataset.column_names,
+    )
+
+    return tokenized_mask_dataset
+
+
+class TacomaCollator(DataCollatorForWholeWordMask):
+    def __init__(self, tokenizer, mask_questions=False, _lambda=12):
+        super().__init__(tokenizer)
+        self.mask_questions = mask_questions
+        self._lambda = _lambda
+
+    # @TODO :: will need to modify call function as well to change _whole_word_mask -> _mask_targets
+    def torch_call(
+        self, examples: List[Union[List[int], Any, Dict[str, Any]]]
+    ) -> Dict[str, Any]:
+        if isinstance(examples[0], Mapping):
+            input_ids = [e["input_ids"] for e in examples]
+        else:
+            input_ids = examples
+            examples = [{"input_ids": e} for e in examples]
+
+        batch_input = _torch_collate_batch(
+            input_ids, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of
         )
 
-        return tokenized_mask_dataset
+        mask_labels = []
+        for e in examples:
+            ref_tokens = []
+            for id in tolist(e["input_ids"]):
+                token = self.tokenizer._convert_id_to_token(id)
+                ref_tokens.append(token)
+
+            # For Chinese tokens, we need extra inf to mark sub-word, e.g [ , ]-> [  ## ]
+            if "chinese_ref" in e:
+                ref_pos = tolist(e["chinese_ref"])
+                len_seq = len(e["input_ids"])
+                for i in range(len_seq):
+                    if i in ref_pos:
+                        ref_tokens[i] = "##" + ref_tokens[i]
+            mask_labels.append(
+                self._mask_targets(ref_tokens, mask_mappings=e["mask_mappings"])
+            )  # @HERE :: apply mask targets
+        batch_mask = _torch_collate_batch(
+            mask_labels, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of
+        )
+        inputs, labels = self.torch_mask_tokens(batch_input, batch_mask)
+        return {"input_ids": inputs, "labels": labels}
+
+    def _mask_targets(
+        self, input_tokens: List[str], max_predictions=512, mask_mappings=None
+    ):
+        """ """
+        if not isinstance(self.tokenizer, (BertTokenizer, BertTokenizerFast)):
+            warnings.warn(
+                "DataCollatorForWholeWordMask is only suitable for BertTokenizer-like tokenizers. "
+                "Please refer to the documentation for more information."
+            )
+
+        if self.mask_questions:
+            mapping_id = random.randint(1, 2)
+        else:
+            mapping_id = 1  # always mask within target sentence
+
+        cand_indexes = []
+        for i, token in enumerate(input_tokens):
+            cand_indexes.append([i])
+
+        cand_indexes = np.array(cand_indexes)
+        cand_indexes = torch.flatten(torch.Tensor(cand_indexes).int())
+
+        mask_mapping_bool = (np.array(mask_mappings[0]) == mapping_id).astype(int)
+
+        mask_mapping_bool = torch.Tensor(mask_mapping_bool).int().bool()
+        targets = torch.masked_select(cand_indexes, mask_mapping_bool).numpy()
+
+        span_length = np.random.poisson(self._lambda)
+
+        # resample from distrib if span too long
+        if span_length >= len(targets):
+            while span_length >= len(targets):
+                span_length -= 1
+
+        cand_indexes = targets[:-span_length]
+        random.shuffle(cand_indexes)
+
+        start_position = cand_indexes[0]
+        end_position = start_position + span_length
+
+        # print(start_position)
+        # print(end_position)
+
+        mask_labels = []
+        for i in range(len(input_tokens)):
+            if i >= start_position and i <= end_position:
+                mask_labels.append(1)
+            else:
+                mask_labels.append(0)
+
+        return mask_labels
+
+    def torch_mask_tokens(self, inputs: Any, mask_labels: Any) -> Tuple[Any, Any]:
+        """
+                Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original. Set
+                'mask_labels' means we use whole word mask (wwm), we directly mask idxs according to it's ref.
+
+        MODIFICATIONS :: apply the mask token 100% of the time!!!
+        """
+        import torch
+
+        if self.tokenizer.mask_token is None:
+            raise ValueError(
+                "This tokenizer does not have a mask token which is necessary for masked language modeling. Remove the"
+                " --mlm flag if you want to use this tokenizer."
+            )
+        labels = inputs.clone()
+        # We sample a few tokens in each sequence for masked-LM training (with probability args.mlm_probability defaults to 0.15 in Bert/RoBERTa)
+
+        probability_matrix = mask_labels
+
+        special_tokens_mask = [
+            self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True)
+            for val in labels.tolist()
+        ]
+        probability_matrix.masked_fill_(
+            torch.tensor(special_tokens_mask, dtype=torch.bool), value=0.0
+        )
+        if self.tokenizer._pad_token is not None:
+            padding_mask = labels.eq(self.tokenizer.pad_token_id)
+            probability_matrix.masked_fill_(padding_mask, value=0.0)
+
+        masked_indices = probability_matrix.bool()
+        labels[~masked_indices] = -100  # We only compute loss on masked tokens
+
+        # @HERE everything is masked unlike in the original implementation!
+        indices_replaced = masked_indices
+        inputs[indices_replaced] = self.tokenizer.convert_tokens_to_ids(
+            self.tokenizer.mask_token
+        )
+
+        return inputs, labels
+
+
+def test_collator():
+    return None
 
 
 def test_case():
@@ -247,7 +410,7 @@ def test_case():
     )
 
     # chunk it up
-    tadam = TadamDatasetGenerator(
+    tadam = TacomaDatasetGenerator(
         corpus=corpus,
         qa_dataset=oqa,
         sentence_classifier=sentence_classifier,
