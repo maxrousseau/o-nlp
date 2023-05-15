@@ -13,7 +13,6 @@ from tqdm.auto import tqdm
 from transformers import get_scheduler, DataCollatorForSeq2Seq, default_data_collator
 
 from accelerate import Accelerator
-from accelerate.utils import ProjectConfiguration
 
 from sentence_transformers.losses import CosineSimilarityLoss
 
@@ -516,6 +515,20 @@ class PretrainT5(BaseTrainer):
                 n_step += 1
 
         self.model.save_pretrained(local_path)
+
+
+class PretrainBERT(BaseTrainer):
+    """ """
+
+    def __init__(self, config):
+        super().__init__(config)
+
+    @torch.no_grad()
+    def __eval(self):
+        None
+
+    def __call__(self):
+        None
 
 
 class FinetuneBERT(BaseTrainer):

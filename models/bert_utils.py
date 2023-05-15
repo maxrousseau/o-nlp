@@ -22,6 +22,7 @@ from datasets import Dataset, load_dataset
 
 from evaluate import load
 
+
 metric = load("squad")
 
 datasets.utils.logging.set_verbosity_warning
@@ -365,19 +366,49 @@ def setup_finetuning_squad(config, only_head=False):
     return config
 
 
-def setup_pretrain_bert(train_path, val_path, config):
+def setup_pretrain_bert(train_path, config):
     """Implement pretraining and test out using TAPT described in the "don't stop pretraining" paper
 
         This should yield performance improvements in theory...
 
     For the masking strategy, copy SpanBERT MLM for now
     """
+    import sys
 
-    # load the datasets
-    config.train_dataset = Dataset.load_from_disk(train_path)
-    config.val_dataset = Dataset.load_from_disk(val_path)
+    sys.path.append("../")
+    from mage import generator
 
-    # apply masked spans dynamically with a datacollator - see DataCollatorWholeWord and modify to get spans
+    # load the datasets, shuffle and split
+    pretraining_dataset = Dataset.load_from_disk(train_path)
+
+    pretraining_dataset = pretraining_dataset.shuffle(
+        seed=config.seed
+    ).train_test_split(test_size=0.1)
+
+    logger.info("datasets loaded from disk, shuffled, training/validation split")
+
+    config.train_dataset = pretraining_dataset["train"]
+    config.val_dataset = pretraining_dataset["test"]
+
+    config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+    logger.info("model and tokenizer initialized")
+
+    tokenized_train_dataset = generator.tokenize_tacoma(
+        config.train_dataset, config.tokenizer
+    )
+    tokenized_val_dataset = generator.tokenize_tacoma(
+        config.val_dataset, config.tokenizer
+    )
+
+    config.train_batches = tokenized_train_dataset.filter(
+        lambda example: example["valid"] == True
+    )
+    config.val_batches = tokenized_val_dataset.filter(
+        lambda example: example["valid"] == True
+    )
+    logger.info("dataset cleaned and tokenized")
 
     return config
 

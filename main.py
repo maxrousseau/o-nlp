@@ -24,6 +24,7 @@ runmode = [
     "bert-finetune",
     "bert-squad-finetune",
     "bert-evaluate",
+    "bert-pretrain",
     "train-classifier",
 ]
 
@@ -146,6 +147,24 @@ def main(argv):
         evaluater = EvaluateBART(config)
         evaluater()
 
+    elif runmode == "bert-pretrain":
+        config = bert_utils.BERTCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bert_utils.setup_pretrain_bert(train_ds_path, config)
+
+        tuner = PretrainBERT(config)
+        tuner()
+
     elif runmode == "bert-finetune":
         config = bert_utils.BERTCFG(
             name=FLAGS.name,
@@ -197,7 +216,7 @@ def main(argv):
         evaluater = EvaluateBERT(config)
         evaluater()
 
-    elif runmode == "pretrain":
+    elif runmode == "t5-pretrain":
         config = t5_utils.T5CFG(
             name=FLAGS.name,
             lr=FLAGS.lr,

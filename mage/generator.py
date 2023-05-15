@@ -185,6 +185,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
     if tokenizer.is_fast:
         inputs["word_ids"] = [i for i in range(len(inputs["input_ids"]))]
 
+    inputs["valid"] = True
     inputs["mask_mappings"] = []
 
     start_pos_sentence = example["target_start"]
@@ -200,20 +201,39 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
 
     question_offset = end_question_mapping + 1  # sep token
 
-    start_sentence_mapping = (
-        find_offset(inputs["offset_mapping"][question_offset:], 0, start_pos_sentence)
-        + question_offset
+    # @BUG :: because the .find method was used I have a bad start position for a particular sentence!! this causes
+    # issues with start of sentence/end of sentence find offset returning None, hacky fix now to just return empty
+    # mask_mapping and remove those samples post-tokenization
+    start_sentence_offset = find_offset(
+        inputs["offset_mapping"][question_offset:], 0, start_pos_sentence
     )
+    if start_sentence_offset == None:
+        inputs["mask_mappings"].append([])
+        inputs["valid"] = False
+        return inputs
 
-    end_sentence_mapping = (
-        find_offset(inputs["offset_mapping"][question_offset:], 1, end_pos_sentence)
-        + question_offset
-    )
+    start_sentence_mapping = start_sentence_offset + question_offset
+
+    # if the end of the sentence is truncated (and that there is no padding)
+    if end_pos_sentence > inputs["offset_mapping"][-2][1] and inputs["offset_mapping"][
+        -2
+    ] != (0, 0):
+        end_sentence_mapping = len(inputs["offset_mapping"]) - 1
+
+    else:
+        end_sentence_offset = find_offset(
+            inputs["offset_mapping"][question_offset:], 1, end_pos_sentence
+        )
+        if end_sentence_offset == None:
+            inputs["mask_mappings"].append([])
+            inputs["valid"] = False
+            return inputs
+        end_sentence_mapping = end_sentence_offset + question_offset
 
     mask_mappings = [0] * 512
+
     num_sentence_tokens = end_sentence_mapping - start_sentence_mapping
     num_question_tokens = end_question_mapping - start_question_mapping
-
     mask_mappings = (
         mask_mappings[:start_sentence_mapping]
         + [1] * (num_sentence_tokens + 1)
@@ -224,6 +244,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
         + [2] * (num_question_tokens + 1)
         + mask_mappings[end_question_mapping + 1 :]
     )
+
     assert len(mask_mappings) == 512
 
     inputs["mask_mappings"].append(mask_mappings)
@@ -419,7 +440,11 @@ def test_case():
     tadam()
 
 
-#    return tadam
+# USAGE:
+# tacoma_tgt = Dataset.load_from_disk("../tmp/tacoma-angle_oqa")
+# tk = tokenize_tacoma(tacoma_tgt, tokenizer)
+# tacoma_collator = TacomaCollator(tokenizer)
+# tacoma_test = tacoma_collator(tk) (this will be for the training function! / dataloader)
 
 
 if __name__ == "__main__":

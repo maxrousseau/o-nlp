@@ -1,0 +1,12 @@
+python main.py^
+ --name="bert-pretraining-test"^
+ --lr=2e-5^
+ --epochs=1^
+ --lr_scheduler=False^
+ --model_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
+ --tokenizer_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
+ --train_dataset="./tmp/tacoma-angle_oqa"^
+ --max_seq_len=512^
+ --seed=0^
+ --runmode="bert-pretrain"^
+ --savedir="./test_path"^
