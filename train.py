@@ -649,8 +649,8 @@ class PretrainBERT(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-                # eval
-                if (steps % 10) == 0:
+                # eval every 100 steps
+                if (steps % 100) == 0:
                     losses = self.__eval(losses)
 
                     wandb.log(
