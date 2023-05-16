@@ -396,8 +396,8 @@ def setup_pretrain_bert(train_path, config):
 
     logger.info("datasets loaded from disk, shuffled, training/validation split")
 
-    config.train_dataset = pretraining_dataset["train"].select(range(10000))
-    config.val_dataset = pretraining_dataset["test"]
+    config.train_dataset = pretraining_dataset["train"].select(range(20))
+    config.val_dataset = pretraining_dataset["test"].select(range(20))
 
     config.model, config.tokenizer = bert_mlm_init(
         config.model_checkpoint, config.tokenizer_checkpoint
