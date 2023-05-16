@@ -344,7 +344,14 @@ class TacomaCollator(DataCollatorForWholeWordMask):
         cand_indexes = targets[:-span_length]
         random.shuffle(cand_indexes)
 
-        start_position = cand_indexes[0]
+        try:
+            start_position = cand_indexes[0]
+        except:
+            print(targets)
+            if len(targets) == 1:
+                span_length = 1
+                start_position = targets[0]
+
         end_position = start_position + span_length
 
         # print(start_position)
