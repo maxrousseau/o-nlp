@@ -15,6 +15,7 @@ from tqdm.auto import tqdm
 from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
+    AutoModelForMaskedLM,
 )
 
 import datasets
@@ -71,6 +72,14 @@ def bert_init(model_checkpoint, tokenizer_chekpoint):
     """Iinitialize BERT model for extractive question answering"""
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
     model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
+
+    return model, tokenizer
+
+
+def bert_mlm_init(model_checkpoint, tokenizer_chekpoint):
+    """Iinitialize BERT model for extractive question answering"""
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
+    model = AutoModelForMaskedLM.from_pretrained(model_checkpoint)
 
     return model, tokenizer
 
@@ -387,10 +396,10 @@ def setup_pretrain_bert(train_path, config):
 
     logger.info("datasets loaded from disk, shuffled, training/validation split")
 
-    config.train_dataset = pretraining_dataset["train"]
-    config.val_dataset = pretraining_dataset["test"]
+    config.train_dataset = pretraining_dataset["train"].select(range(1))
+    config.val_dataset = pretraining_dataset["test"].select(range(8))
 
-    config.model, config.tokenizer = bert_init(
+    config.model, config.tokenizer = bert_mlm_init(
         config.model_checkpoint, config.tokenizer_checkpoint
     )
     logger.info("model and tokenizer initialized")

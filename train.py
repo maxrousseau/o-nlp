@@ -10,6 +10,8 @@ from models import t5_utils, t5_fp16_utils, bert_utils, bart_utils
 
 from tqdm.auto import tqdm
 
+from mage.generator import TacomaCollator
+
 from transformers import get_scheduler, DataCollatorForSeq2Seq, default_data_collator
 
 from accelerate import Accelerator
@@ -522,13 +524,149 @@ class PretrainBERT(BaseTrainer):
 
     def __init__(self, config):
         super().__init__(config)
+        self.mask_questions = False
 
     @torch.no_grad()
-    def __eval(self):
-        None
+    def __eval(self, losses):
+        self.model.eval()
+        for i, batch in enumerate(tqdm(self.val_dataloader)):
+            outputs = self.model(**batch)
+            losses["val"].append(outputs.loss.item())
+        self.model.train()
+        return losses
+
+    def __get_dataloader(self):
+        train_tensor = self.train_batches
+        train_tensor.set_format("torch")
+
+        tacoma_data_collator = TacomaCollator(
+            self.tokenizer,
+            mask_questions=self.mask_questions,
+            _lambda=17,  # mean answer length (tokens) from OQA
+        )
+
+        self.train_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=tacoma_data_collator,
+            batch_size=8,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
+        val_tensor = self.val_batches
+        val_tensor.set_format("torch")
+        self.val_dataloader = DataLoader(
+            val_tensor,
+            collate_fn=tacoma_data_collator,
+            batch_size=4,
+            shuffle=False,
+        )
+
+        self.logger.info("Training and validation dataloaders created")
+
+    def __save_checkpoint(self, accelerator, n_step):
+        ckpt_path = "./ckpts/"
+        ckpt_max = 5
+
+        if not os.path.exists(ckpt_path):
+            os.makedirs(ckpt_path)
+
+        dirs = [
+            os.path.relpath(ckpt_path + f.name)
+            for f in os.scandir(ckpt_path)
+            if f.is_dir()
+        ]
+        dirs.sort(key=os.path.getctime)
+
+        if len(dirs) >= ckpt_max:
+            shutil.rmtree(dirs[0])
+
+        accelerator.save_state("./ckpts/{}-{}steps".format(self.name, n_step))
 
     def __call__(self):
-        None
+        self.__get_dataloader()
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        save_path = os.path.abspath(
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
+
+        # experiment tracking
+        # wandb.init(
+        #     project="o-nlp_experiments",
+        #     config={
+        #         "learning_rate": self.lr,
+        #         "architecture": self.name,
+        #         "dataset": "oqa",
+        #         "epochs": self.num_epochs,
+        #     },
+        # )
+
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+
+        # accelerator
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=100,
+                num_training_steps=num_training_steps,
+            )
+
+        if torch.device != "cpu":
+            # @BUG mixed precision breaks generation
+            accelerator = Accelerator(mixed_precision="fp16")
+            (
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                self.val_dataloader,
+            ) = accelerator.prepare(
+                self.model, optimizer, self.train_dataloader, self.val_dataloader
+            )
+            if self.lr_scheduler:
+                accelerator.register_for_checkpointing(lr_scheduler)
+
+        losses = {"train": [], "val": []}
+
+        # training loop
+        progressbar = tqdm(range(num_training_steps))
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            for steps, batch in enumerate(self.train_dataloader):
+                outputs = self.model(**batch)
+                loss = outputs.loss
+                accelerator.backward(loss)
+                losses["train"].append(loss.item())
+
+                optimizer.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
+
+                # eval
+                if (steps % 10) == 0:
+                    losses = self.__eval(losses)
+                    self.logger.info(
+                        "step {} : train_loss : {}, val_loss {}".format(
+                            steps,
+                            np.array(losses["train"]).mean(),
+                            np.array(losses["val"]).mean(),
+                        )
+                    )
+                    losses = {"train": [], "val": []}
+
+                    # TODO save checkpoint
+
+            # wandb.log(
+            #     {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
+            # )
+
+        # TODO save final model
 
 
 class FinetuneBERT(BaseTrainer):

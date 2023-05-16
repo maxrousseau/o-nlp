@@ -1,7 +1,7 @@
 python main.py^
  --name="bert-pretraining-test"^
- --lr=2e-5^
- --epochs=1^
+ --lr=3e-4^
+ --epochs=3^
  --lr_scheduler=False^
  --model_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
  --tokenizer_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
