@@ -573,7 +573,7 @@ class PretrainBERT(BaseTrainer):
             os.makedirs(self.checkpoint_savedir)
 
         dirs = [
-            os.path.relpath(self.checkpoint_savedir + f.name)
+            os.path.relpath(self.checkpoint_savedir + "/" + f.name)
             for f in os.scandir(self.checkpoint_savedir)
             if f.is_dir()
         ]
