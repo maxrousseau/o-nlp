@@ -665,14 +665,19 @@ class PretrainBERT(BaseTrainer):
                     # TODO save checkpoint
                     self.__save_checkpoint(accelerator, n_step=steps)
 
+            losses = self.__eval(losses)
             if losses["train"] != []:
-                wandb.log(
-                    {
-                        "val_loss": np.array(losses["val"]).mean(),
-                        "train_loss": np.array(losses["train"]).mean(),
-                        "n_step": steps,
-                    }
-                )
+                train_loss = None
+            else:
+                train_loss = np.array(losses["train"]).mean()
+
+            wandb.log(
+                {
+                    "val_loss": np.array(losses["val"]).mean(),
+                    "train_loss": train_loss,
+                    "n_step": steps,
+                }
+            )
             self.save_model(save_path)
 
             # TODO test 10k samples
