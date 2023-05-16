@@ -1,7 +1,7 @@
 python main.py^
  --name="bert-pretraining-test"^
  --lr=3e-4^
- --epochs=3^
+ --epochs=1^
  --lr_scheduler=False^
  --model_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
  --tokenizer_checkpoint="google/bert_uncased_L-2_H-128_A-2"^
@@ -9,4 +9,4 @@ python main.py^
  --max_seq_len=512^
  --seed=0^
  --runmode="bert-pretrain"^
- --savedir="./test_path"^
+ --savedir="./bert_ckpts"^

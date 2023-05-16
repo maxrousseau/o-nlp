@@ -567,15 +567,14 @@ class PretrainBERT(BaseTrainer):
         self.logger.info("Training and validation dataloaders created")
 
     def __save_checkpoint(self, accelerator, n_step):
-        ckpt_path = "./ckpts/"
         ckpt_max = 5
 
-        if not os.path.exists(ckpt_path):
-            os.makedirs(ckpt_path)
+        if not os.path.exists(self.checkpoint_savedir):
+            os.makedirs(self.checkpoint_savedir)
 
         dirs = [
-            os.path.relpath(ckpt_path + f.name)
-            for f in os.scandir(ckpt_path)
+            os.path.relpath(self.checkpoint_savedir + f.name)
+            for f in os.scandir(self.checkpoint_savedir)
             if f.is_dir()
         ]
         dirs.sort(key=os.path.getctime)
@@ -583,25 +582,27 @@ class PretrainBERT(BaseTrainer):
         if len(dirs) >= ckpt_max:
             shutil.rmtree(dirs[0])
 
-        accelerator.save_state("./ckpts/{}-{}steps".format(self.name, n_step))
+        accelerator.save_state(
+            "{}/{}-{}steps".format(self.checkpoint_savedir, self.name, n_step)
+        )
 
     def __call__(self):
         self.__get_dataloader()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}/final-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         # experiment tracking
-        # wandb.init(
-        #     project="o-nlp_experiments",
-        #     config={
-        #         "learning_rate": self.lr,
-        #         "architecture": self.name,
-        #         "dataset": "oqa",
-        #         "epochs": self.num_epochs,
-        #     },
-        # )
+        wandb.init(
+            project="o-nlp_experiments",
+            config={
+                "learning_rate": self.lr,
+                "architecture": self.name,
+                "dataset": "tacoma-angle_oqa",
+                "epochs": self.num_epochs,
+            },
+        )
 
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_update_steps_per_epoch = len(self.train_dataloader)
@@ -651,22 +652,30 @@ class PretrainBERT(BaseTrainer):
                 # eval
                 if (steps % 10) == 0:
                     losses = self.__eval(losses)
-                    self.logger.info(
-                        "step {} : train_loss : {}, val_loss {}".format(
-                            steps,
-                            np.array(losses["train"]).mean(),
-                            np.array(losses["val"]).mean(),
-                        )
+
+                    wandb.log(
+                        {
+                            "val_loss": np.array(losses["val"]).mean(),
+                            "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": steps,
+                        }
                     )
                     losses = {"train": [], "val": []}
 
                     # TODO save checkpoint
+                    self.__save_checkpoint(accelerator, n_step=steps)
 
-            # wandb.log(
-            #     {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
-            # )
+            if losses["train"] != []:
+                wandb.log(
+                    {
+                        "val_loss": np.array(losses["val"]).mean(),
+                        "train_loss": np.array(losses["train"]).mean(),
+                        "n_step": steps,
+                    }
+                )
+            self.save_model(save_path)
 
-        # TODO save final model
+            # TODO test 10k samples
 
 
 class FinetuneBERT(BaseTrainer):
