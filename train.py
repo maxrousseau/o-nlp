@@ -725,7 +725,7 @@ class FinetuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=16,
+            batch_size=4,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -736,7 +736,7 @@ class FinetuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=16,
+            batch_size=4,
             shuffle=False,
         )
 
