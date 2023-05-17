@@ -592,6 +592,7 @@ class PretrainBERT(BaseTrainer):
         save_path = os.path.abspath(
             "{}/final-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
+        best_val_loss = 100
 
         # experiment tracking
         wandb.init(
@@ -652,6 +653,14 @@ class PretrainBERT(BaseTrainer):
                 # eval every 100 steps
                 if (steps % 100) == 0:
                     losses = self.__eval(losses)
+                    if np.array(losses["val"]).mean() < best_val_loss:
+                        best_val_path = os.path.abspath(
+                            "{}/bestval-{}-{}".format(
+                                self.checkpoint_savedir, self.name, timestamp
+                            )
+                        )
+                        self.save_model(best_val_path)
+                        best_val_loss = np.array(losses["val"]).mean()
 
                     wandb.log(
                         {
@@ -662,7 +671,6 @@ class PretrainBERT(BaseTrainer):
                     )
                     losses = {"train": [], "val": []}
 
-                    # TODO save checkpoint
                     self.__save_checkpoint(accelerator, n_step=steps)
 
             losses = self.__eval(losses)
@@ -679,8 +687,11 @@ class PretrainBERT(BaseTrainer):
                 }
             )
             self.save_model(save_path)
-
-            # TODO test 10k samples
+            self.logger.info(
+                "Pretraining finished with best validation loss at {}!".format(
+                    best_val_loss
+                )
+            )
 
 
 class FinetuneBERT(BaseTrainer):
@@ -725,7 +736,7 @@ class FinetuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=4,
+            batch_size=8,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -736,7 +747,7 @@ class FinetuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=4,
+            batch_size=8,
             shuffle=False,
         )
 
