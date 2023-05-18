@@ -406,12 +406,12 @@ def setup_finetuning_splinter_oqa(train_path, val_path, config, train_tacoma=Fal
     return config
 
 
-def setup_finetuning_squad(config, only_head=False):
+def setup_finetuning_squad(val_path, config, only_head=False):
     squad = load_dataset(
         "squad", download_mode="force_redownload"
     )  # @BUG remove for caching
     config.train_dataset = squad["train"]
-    config.val_dataset = squad["validation"]
+    config.val_dataset = Dataset.load_from_disk(val_path)
 
     # !bert
 
@@ -423,7 +423,12 @@ def setup_finetuning_squad(config, only_head=False):
 
     if only_head:
         for name, param in config.model.bert.named_parameters():
-            param.requires_grad = False
+            train_layers = ["10, 11"]
+            for l in train_layers:
+                if name.startwith("encode.layer.{}".format(l)):
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
 
     logger.info("model and tokenizer initialized")
 

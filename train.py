@@ -737,7 +737,7 @@ class FinetuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=16,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -748,7 +748,7 @@ class FinetuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=16,
             shuffle=False,
         )
 
@@ -784,7 +784,7 @@ class FinetuneBERT(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=100,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 
@@ -820,18 +820,22 @@ class FinetuneBERT(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-            # eval
-            f1_score = self.__eval(accelerator)
-            self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
-            wandb.log(
-                {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
-            )
+                if steps % 100:
+                    # eval
+                    f1_score = self.__eval(accelerator)
+                    self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
+                    wandb.log(
+                        {
+                            "val_f1": f1_score,
+                            "train_loss": np.array(losses["train"]).mean(),
+                        }
+                    )
 
-            # checkpointing (only best_val)
-            if f1_score > best_f1:
-                self.save_model(save_path)
-                best_f1 = f1_score
-                self.logger.info("New save with f1 = {}".format(best_f1))
+                    # checkpointing (only best_val)
+                    if f1_score > best_f1:
+                        self.save_model(save_path)
+                        best_f1 = f1_score
+                        self.logger.info("New save with f1 = {}".format(best_f1))
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
