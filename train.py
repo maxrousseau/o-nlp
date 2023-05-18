@@ -820,14 +820,15 @@ class FinetuneBERT(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-                if steps % 100:
+                if steps % 100 == 0:
                     # eval
                     f1_score = self.__eval(accelerator)
-                    self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
+                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
                     wandb.log(
                         {
                             "val_f1": f1_score,
                             "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": steps,
                         }
                     )
 
