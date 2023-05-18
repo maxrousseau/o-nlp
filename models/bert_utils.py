@@ -351,8 +351,8 @@ def setup_finetuning_splinter_oqa(train_path, val_path, config):
     object which contains everything needed to instantiate a trainer and run.
     """
 
-    config.train_dataset = Dataset.load_from_disk(train_path).select(range(8))
-    config.val_dataset = Dataset.load_from_disk(val_path).select(range(8))
+    config.train_dataset = Dataset.load_from_disk(train_path)
+    config.val_dataset = Dataset.load_from_disk(val_path)
 
     logger.info("datasets loaded from disk")
 
