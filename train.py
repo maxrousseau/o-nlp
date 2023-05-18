@@ -963,22 +963,22 @@ class FinetuneSplinter(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-                if steps % 100 == 0:
-                    # eval
-                    f1_score = self.__eval(accelerator)
-                    self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
-                    wandb.log(
-                        {
-                            "val_f1": f1_score,
-                            "train_loss": np.array(losses["train"]).mean(),
-                        }
-                    )
+                # if steps % 100 == 0:
+            # eval
+            f1_score = self.__eval(accelerator)
+            self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
+            wandb.log(
+                {
+                    "val_f1": f1_score,
+                    "train_loss": np.array(losses["train"]).mean(),
+                }
+            )
 
-                    # checkpointing (only best_val)
-                    if f1_score > best_f1:
-                        self.save_model(save_path)
-                        best_f1 = f1_score
-                        self.logger.info("New save with f1 = {}".format(best_f1))
+            # checkpointing (only best_val)
+            if f1_score > best_f1:
+                self.save_model(save_path)
+                best_f1 = f1_score
+                self.logger.info("New save with f1 = {}".format(best_f1))
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
