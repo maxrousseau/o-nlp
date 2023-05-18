@@ -880,7 +880,7 @@ class FinetuneSplinter(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=12,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -891,7 +891,7 @@ class FinetuneSplinter(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=12,
             shuffle=False,
         )
 
@@ -927,7 +927,7 @@ class FinetuneSplinter(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=100,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 
