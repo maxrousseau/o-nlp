@@ -25,6 +25,7 @@ runmode = [
     "bert-squad-finetune",
     "bert-evaluate",
     "bert-pretrain",
+    "splinter-finetune",
     "train-classifier",
 ]
 
@@ -181,6 +182,24 @@ def main(argv):
         config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
 
         tuner = FinetuneBERT(config)
+        tuner()
+    elif runmode == "splinter-finetune":
+        config = bert_utils.BERTCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bert_utils.setup_finetuning_splinter_oqa(
+            train_ds_path, val_ds_path, config
+        )
+        tuner = FinetuneSplinter(config)
         tuner()
 
     elif runmode == "bert-squad-finetune":

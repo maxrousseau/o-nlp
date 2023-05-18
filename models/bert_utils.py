@@ -16,6 +16,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
     AutoModelForMaskedLM,
+    SplinterForQuestionAnswering,
 )
 
 import datasets
@@ -77,9 +78,17 @@ def bert_init(model_checkpoint, tokenizer_chekpoint):
 
 
 def bert_mlm_init(model_checkpoint, tokenizer_chekpoint):
-    """Iinitialize BERT model for extractive question answering"""
+    """Iinitialize BERT model for masked language modelling"""
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
     model = AutoModelForMaskedLM.from_pretrained(model_checkpoint)
+
+    return model, tokenizer
+
+
+def splinter_init(model_checkpoint, tokenizer_chekpoint):
+    """Iinitialize splinter model for extractive question answering"""
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
+    model = SplinterForQuestionAnswering.from_pretrained(model_checkpoint)
 
     return model, tokenizer
 
@@ -309,6 +318,45 @@ def setup_finetuning_oqa(train_path, val_path, config):
     logger.info("datasets loaded from disk")
 
     config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    logger.info("model and tokenizer initialized")
+
+    config.train_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config
+
+
+def setup_finetuning_splinter_oqa(train_path, val_path, config):
+    """
+        Setup function for fine-tuning BERT-like models on OQA-v1.0
+
+        Load and preprocess the training and validation data. Initialize the model and tokenizer. Returns the config
+    object which contains everything needed to instantiate a trainer and run.
+    """
+
+    config.train_dataset = Dataset.load_from_disk(train_path).select(range(8))
+    config.val_dataset = Dataset.load_from_disk(val_path).select(range(8))
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = splinter_init(
         config.model_checkpoint, config.tokenizer_checkpoint
     )
 
