@@ -363,7 +363,7 @@ def format_tacoma_qa(dataset):
     return dataset
 
 
-def setup_finetuning_splinter_oqa(train_path, val_path, config, tacoma=False):
+def setup_finetuning_splinter_oqa(train_path, val_path, config, train_tacoma=True):
     """
         Setup function for fine-tuning BERT-like models on OQA-v1.0
 
@@ -374,7 +374,7 @@ def setup_finetuning_splinter_oqa(train_path, val_path, config, tacoma=False):
     config.train_dataset = Dataset.load_from_disk(train_path)
     config.val_dataset = Dataset.load_from_disk(val_path)
 
-    if tacoma == True:
+    if train_tacoma == True:
         config.train_dataset = config.train_dataset.shuffle(seed=config.seed)
         config.train_dataset = format_tacoma_qa(config.train_dataset)
 
