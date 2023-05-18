@@ -425,7 +425,7 @@ def setup_finetuning_squad(val_path, config, only_head=False):
         for name, param in config.model.bert.named_parameters():
             train_layers = ["10, 11"]
             for l in train_layers:
-                if name.startwith("encode.layer.{}".format(l)):
+                if name.startwith("encoder.layer.{}".format(l)):
                     param.requires_grad = True
                 else:
                     param.requires_grad = False
