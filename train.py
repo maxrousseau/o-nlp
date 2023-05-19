@@ -1429,7 +1429,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=4
+        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=16
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
@@ -1635,6 +1635,8 @@ class MetatuneBERT(BaseTrainer):
                                         print(n_updates)
 
                                 n_step_small += 1
+                                if n_step_small > num_steps_per_epoch_small:
+                                    n_step_small = 0
 
                             # reset no_improvement
                             no_improvement = 0
@@ -1644,7 +1646,7 @@ class MetatuneBERT(BaseTrainer):
                                 {
                                     "val_f1": f1_score,
                                     "train_loss": np.array(losses["train"]).mean(),
-                                    "n_step": steps,
+                                    "n_step": steps + self.n_step_nudge,
                                 }
                             )
 
