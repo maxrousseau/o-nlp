@@ -2,6 +2,7 @@ import os
 import logging
 import shutil
 from datetime import datetime
+import itertools
 
 import numpy as np
 import random
@@ -1427,7 +1428,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=200, stagnation_threshold=1, n_steps_nudge=1
+        self, config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=1
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
@@ -1560,6 +1561,8 @@ class MetatuneBERT(BaseTrainer):
 
         losses = {"train": []}
 
+        train_iterator = itertools.cycle(self.train_dataloader)
+
         no_improvement = 0
         n_step_small = 0
 
@@ -1572,7 +1575,12 @@ class MetatuneBERT(BaseTrainer):
             for steps, batch in enumerate(self.big_dataloader):
 
                 outputs = self.model(**batch)
-                loss = outputs.loss
+                loss_big = outputs.loss
+
+                target_batch = next(train_iterator)
+                outputs = self.model(**target_batch)
+                loss = loss_big + outputs.loss
+
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
 
