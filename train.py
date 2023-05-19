@@ -12,7 +12,12 @@ from tqdm.auto import tqdm
 
 from mage.generator import TacomaCollator
 
-from transformers import get_scheduler, DataCollatorForSeq2Seq, default_data_collator
+from transformers import (
+    get_scheduler,
+    DataCollatorForSeq2Seq,
+    default_data_collator,
+    AutoModelForQuestionAnswering,
+)
 
 from accelerate import Accelerator
 
@@ -1416,4 +1421,234 @@ class Setfit(SetFitTrainer):
         self.save_model(save_path)
         self.logger.info(
             "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
+        )
+
+
+# @HERE :: copy this class and adapt for Splinter (see HF)
+class MetatuneBERT(BaseTrainer):
+    """ """
+
+    def __init__(
+        self, config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=4
+    ):
+        super().__init__(config)
+        self.big_dataset = config.big_dataset
+        self.big_batches = config.big_batches
+        self.n_step_eval = n_step_eval
+        self.stagnation_threshold = stagnation_threshold
+        self.n_step_nudge = n_steps_nudge
+
+    @torch.no_grad()
+    def __eval(self, accelerator):
+        """ """
+        start_logits = []
+        end_logits = []
+
+        self.model.eval()
+
+        for batch in tqdm(self.val_dataloader):
+            outputs = self.model(**batch)
+            start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
+            end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
+
+        start_logits = np.concatenate(start_logits)
+        end_logits = np.concatenate(end_logits)
+        start_logits = start_logits[: len(self.val_batches)]
+        end_logits = end_logits[: len(self.val_batches)]
+        metrics, unused, unused = bert_utils.answer_from_logits(
+            start_logits,
+            end_logits,
+            self.val_batches,
+            self.val_dataset,
+            self.tokenizer,
+        )
+        f1_score = metrics["f1"]
+        accelerator.wait_for_everyone()
+        return f1_score
+
+    def __get_dataloaders(self):
+        """"""
+        train_tensor = self.train_batches
+        train_tensor.set_format("torch")
+        self.train_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=default_data_collator,
+            batch_size=16,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
+        big_tensor = self.big_batches
+        big_tensor.set_format("torch")
+        self.big_dataloader = DataLoader(
+            big_tensor,
+            shuffle=True,
+            collate_fn=default_data_collator,
+            batch_size=16,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
+        val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
+        val_tensor.set_format("torch")
+        self.val_dataloader = DataLoader(
+            val_tensor,
+            collate_fn=default_data_collator,
+            batch_size=16,
+            shuffle=False,
+        )
+
+        self.logger.info("Training and validation dataloaders created")
+
+    def __call__(self):
+
+        # dataloaders
+        self.__get_dataloaders()
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        save_path = os.path.abspath(
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
+
+        # experiment tracking
+        wandb.init(
+            project="o-nlp_experiments",
+            config={
+                "learning_rate": self.lr,
+                "architecture": self.name,
+                "dataset": "squad-oqa",
+                "epochs": self.num_epochs,
+            },
+        )
+
+        best_f1 = -1
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_steps_per_epoch_big = len(self.big_dataloader)
+        num_training_steps = self.num_epochs * num_steps_per_epoch_big
+
+        num_steps_per_epoch_small = len(self.train_dataloader)
+
+        # accelerator
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=0.1 * num_training_steps,
+                num_training_steps=num_training_steps,
+            )
+
+        if torch.device != "cpu":
+            # @BUG mixed precision breaks generation
+            accelerator = Accelerator(mixed_precision="fp16")
+            (
+                self.model,
+                optimizer,
+                self.big_dataloader,
+                self.train_dataloader,
+                self.val_dataloader,
+            ) = accelerator.prepare(
+                self.model,
+                optimizer,
+                self.big_dataloader,
+                self.train_dataloader,
+                self.val_dataloader,
+            )
+            if self.lr_scheduler:
+                accelerator.register_for_checkpointing(lr_scheduler)
+
+        losses = {"train": []}
+
+        no_improvement = 0
+        n_step_small = 0
+
+        # training loop
+        progressbar = tqdm(range(num_training_steps))
+
+        # outer loop
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            for steps, batch in enumerate(self.big_dataloader):
+                outputs = self.model(**batch)
+                loss = outputs.loss
+                accelerator.backward(loss)
+                losses["train"].append(loss.detach().cpu().numpy())
+
+                optimizer.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
+
+                if steps % self.n_step_eval == 0:
+                    # eval
+                    f1_score = self.__eval(accelerator)
+                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+                    wandb.log(
+                        {
+                            "val_f1": f1_score,
+                            "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": steps,
+                        }
+                    )
+
+                    # checkpointing (only best_val)
+                    if f1_score > best_f1:
+                        self.save_model(save_path)
+                        best_f1 = f1_score
+                        self.logger.info("New save with f1 = {}".format(best_f1))
+
+                    if f1_score < best_f1:
+                        no_improvement += 1
+                        if no_improvement >= self.stagnation_threshold:
+
+                            # inner training loop @HERE
+
+                            # reload last best weights, improve this by simply caching the weights to memory during runtime
+                            self.model = AutoModelForQuestionAnswering.from_pretrained(
+                                save_path
+                            )
+                            n_updates = self.n_step_nudge
+                            for steps, batch in enumerate(self.train_dataloader):
+                                if steps < n_step_small:
+                                    continue
+                                else:
+                                    if n_updates > 0:
+                                        n_updates -= 1
+                                        outputs = self.model(**batch)
+                                        loss = outputs.loss
+                                        accelerator.backward(loss)
+                                        losses["train"].append(
+                                            loss.detach().cpu().numpy()
+                                        )
+                                        optimizer.step()
+                                        if self.lr_scheduler:
+                                            lr_scheduler.step()
+                                            optimizer.zero_grad()
+
+                                n_step_small += 1
+
+                            # reset no_improvement
+                            no_improvement = 0
+                            f1_score = self.__eval(accelerator)
+                            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+                            wandb.log(
+                                {
+                                    "val_f1": f1_score,
+                                    "train_loss": np.array(losses["train"]).mean(),
+                                    "n_step": steps,
+                                }
+                            )
+
+                            # checkpointing (only best_val)
+                            if f1_score > best_f1:
+                                self.save_model(save_path)
+                                best_f1 = f1_score
+                                self.logger.info(
+                                    "New save with f1 = {}".format(best_f1)
+                                )
+
+        self.logger.info(
+            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )

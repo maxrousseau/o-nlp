@@ -53,10 +53,12 @@ class BERTCFG:
     checkpoint_state: str = None
     checkpoint_step: int = None
 
+    big_dataset: Dataset = None
     train_dataset: Dataset = None
     val_dataset: Dataset = None
     test_dataset: Dataset = None
 
+    big_batches: Any = None
     val_batches: Any = None
     train_batches: Any = None
     test_batches: Any = None
@@ -431,6 +433,61 @@ def setup_finetuning_squad(val_path, config, only_head=False):
                     param.requires_grad = False
 
     logger.info("model and tokenizer initialized")
+
+    config.train_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="eval",
+    )
+
+    return config
+
+
+def setup_metatune(train_path, val_path, config, only_head=False):
+    squad = load_dataset(
+        "squad",
+    )  # @BUG remove for caching
+    config.big_dataset = squad["train"].select(range(100))
+    config.train_dataset = Dataset.load_from_disk(train_path).select(range(10))
+    config.val_dataset = Dataset.load_from_disk(val_path).select(range(8))
+
+    # !bert
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    if only_head:
+        for name, param in config.model.bert.named_parameters():
+            train_layers = ["8", "9", "10, 11"]
+            for l in train_layers:
+                if name.startswith("encoder.layer.{}".format(l)):
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+
+    logger.info("model and tokenizer initialized")
+    config.big_batches = prepare_inputs(
+        config.big_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
 
     config.train_batches = prepare_inputs(
         config.train_dataset,

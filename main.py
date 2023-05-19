@@ -27,6 +27,7 @@ runmode = [
     "bert-pretrain",
     "splinter-finetune",
     "train-classifier",
+    "bert-metatune",
 ]
 
 flags.DEFINE_string(
@@ -202,6 +203,25 @@ def main(argv):
         tuner = FinetuneSplinter(config)
         tuner()
 
+    elif runmode == "bert-metatune":
+        config = bert_utils.BERTCFG(
+            name=FLAGS.name,
+            lr=FLAGS.lr,
+            lr_scheduler=FLAGS.lr_scheduler,
+            n_epochs=FLAGS.epochs,
+            model_checkpoint=FLAGS.model_checkpoint,
+            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
+            checkpoint_savedir=FLAGS.savedir,
+            max_length=FLAGS.max_seq_len,
+            seed=FLAGS.seed,
+            runmode=FLAGS.runmode,
+        )
+        config = bert_utils.setup_finetuning_squad(
+            val_ds_path, config, only_head=FLAGS.only_cls_head
+        )
+        tuner = MetatuneBERT(config)
+        tuner()
+
     elif runmode == "bert-squad-finetune":
         config = bert_utils.BERTCFG(
             name=FLAGS.name,
@@ -255,6 +275,7 @@ def main(argv):
         config = t5_utils.setup_pretrain_t5(train_ds_path, config)
         pretrainer = PretrainT5(config)
         pretrainer()
+
     elif runmode == "train-classifier":
         config = setfit_utils.SFCFG(
             name=FLAGS.name,
