@@ -1602,9 +1602,8 @@ class MetatuneBERT(BaseTrainer):
                         self.logger.info("New save with f1 = {}".format(best_f1))
                         no_improvement = 0
 
-                    # debug
-                    # if f1_score < best_f1:
-                    if True:
+                    if f1_score < best_f1:
+                        # if True:                # debug
                         no_improvement += 1
                         if no_improvement >= self.stagnation_threshold:
                             self.logger.info("inner training loop launched")
