@@ -1619,7 +1619,7 @@ class MetatuneBERT(BaseTrainer):
                             for inner_steps, inner_batch in enumerate(
                                 self.train_dataloader
                             ):
-                                print(n_step_small)
+
                                 if inner_steps < n_step_small:
                                     continue
                                 else:
