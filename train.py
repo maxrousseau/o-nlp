@@ -1429,7 +1429,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=16
+        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=4
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
@@ -1617,6 +1617,7 @@ class MetatuneBERT(BaseTrainer):
                             for inner_steps, inner_batch in enumerate(
                                 self.train_dataloader
                             ):
+                                print(n_step_small)
                                 if inner_steps < n_step_small:
                                     continue
                                 else:
@@ -1632,11 +1633,11 @@ class MetatuneBERT(BaseTrainer):
                                         if self.lr_scheduler:
                                             lr_scheduler.step()
                                         optimizer.zero_grad()
-                                        print(n_updates)
+                                        n_step_small += 1
+                                        print(inner_steps)
 
-                                n_step_small += 1
-                                if n_step_small > num_steps_per_epoch_small:
-                                    n_step_small = 0
+                                        if n_step_small > num_steps_per_epoch_small:
+                                            n_step_small = 0
 
                             # reset no_improvement
                             no_improvement = 0
