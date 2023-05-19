@@ -1428,7 +1428,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=1
+        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=1
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
@@ -1529,8 +1529,6 @@ class MetatuneBERT(BaseTrainer):
         num_steps_per_epoch_big = len(self.big_dataloader)
         num_training_steps = self.num_epochs * num_steps_per_epoch_big
 
-        num_steps_per_epoch_small = len(self.train_dataloader)
-
         # accelerator
         if self.lr_scheduler:
             lr_scheduler = get_scheduler(
@@ -1564,7 +1562,6 @@ class MetatuneBERT(BaseTrainer):
         train_iterator = itertools.cycle(self.train_dataloader)
 
         no_improvement = 0
-        n_step_small = 0
 
         # training loop
         progressbar = tqdm(range(num_training_steps))
@@ -1621,30 +1618,17 @@ class MetatuneBERT(BaseTrainer):
                             accelerator.load_state(save_path)
 
                             n_updates = self.n_step_nudge
-                            for inner_steps, inner_batch in enumerate(
-                                self.train_dataloader
-                            ):
-
-                                if inner_steps < n_step_small:
-                                    continue
-                                else:
-                                    if n_updates > 0:
-                                        n_updates -= 1
-                                        outputs = self.model(**inner_batch)
-                                        loss = outputs.loss
-                                        accelerator.backward(loss)
-                                        losses["train"].append(
-                                            loss.detach().cpu().numpy()
-                                        )
-                                        optimizer.step()
-                                        if self.lr_scheduler:
-                                            lr_scheduler.step()
-                                        optimizer.zero_grad()
-                                        n_step_small += 1
-                                        print(inner_steps)
-
-                                        if n_step_small > num_steps_per_epoch_small:
-                                            n_step_small = 0
+                            while n_updates > 0:
+                                n_updates -= 1
+                                target_batch = next(train_iterator)
+                                outputs = self.model(**target_batch)
+                                loss = outputs.loss
+                                accelerator.backward(loss)
+                                losses["train"].append(loss.detach().cpu().numpy())
+                                optimizer.step()
+                                if self.lr_scheduler:
+                                    lr_scheduler.step()
+                                optimizer.zero_grad()
 
                             # reset no_improvement
                             no_improvement = 0
