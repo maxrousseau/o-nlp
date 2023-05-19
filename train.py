@@ -1428,7 +1428,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=1
+        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=4
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
@@ -1475,7 +1475,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=2,
+            batch_size=6,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1487,7 +1487,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=14,
+            batch_size=10,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
