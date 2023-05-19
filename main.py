@@ -219,7 +219,9 @@ def main(argv):
         config = bert_utils.setup_metatune(
             train_ds_path, val_ds_path, config, only_head=FLAGS.only_cls_head
         )
-        tuner = MetatuneBERT(config, n_step_eval=200)
+        tuner = MetatuneBERT(
+            config, n_step_eval=200, stagnation_threshold=3, n_steps_nudge=4
+        )
         tuner()
 
     elif runmode == "bert-squad-finetune":
