@@ -458,9 +458,9 @@ def setup_metatune(train_path, val_path, config, only_head=False):
     squad = load_dataset(
         "squad",
     )  # @BUG remove for caching
-    config.big_dataset = squad["train"].select(range(100))
-    config.train_dataset = Dataset.load_from_disk(train_path).select(range(10))
-    config.val_dataset = Dataset.load_from_disk(val_path).select(range(8))
+    config.big_dataset = squad["train"]
+    config.train_dataset = Dataset.load_from_disk(train_path)
+    config.val_dataset = Dataset.load_from_disk(val_path)
 
     # !bert
 

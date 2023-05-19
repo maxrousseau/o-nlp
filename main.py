@@ -216,10 +216,10 @@ def main(argv):
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
         )
-        config = bert_utils.setup_finetuning_squad(
-            val_ds_path, config, only_head=FLAGS.only_cls_head
+        config = bert_utils.setup_metatune(
+            train_ds_path, val_ds_path, config, only_head=FLAGS.only_cls_head
         )
-        tuner = MetatuneBERT(config)
+        tuner = MetatuneBERT(config, n_step_eval=100)
         tuner()
 
     elif runmode == "bert-squad-finetune":

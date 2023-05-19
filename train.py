@@ -1455,6 +1455,7 @@ class MetatuneBERT(BaseTrainer):
         end_logits = np.concatenate(end_logits)
         start_logits = start_logits[: len(self.val_batches)]
         end_logits = end_logits[: len(self.val_batches)]
+
         metrics, unused, unused = bert_utils.answer_from_logits(
             start_logits,
             end_logits,
@@ -1464,6 +1465,7 @@ class MetatuneBERT(BaseTrainer):
         )
         f1_score = metrics["f1"]
         accelerator.wait_for_everyone()
+        self.model.train()
         return f1_score
 
     def __get_dataloaders(self):
@@ -1568,8 +1570,9 @@ class MetatuneBERT(BaseTrainer):
 
         # outer loop
         for epoch in range(self.num_epochs):
-            self.model.train()
+
             for steps, batch in enumerate(self.big_dataloader):
+
                 outputs = self.model(**batch)
                 loss = outputs.loss
                 accelerator.backward(loss)
@@ -1579,7 +1582,6 @@ class MetatuneBERT(BaseTrainer):
                 if self.lr_scheduler:
                     lr_scheduler.step()
                 optimizer.zero_grad()
-                progressbar.update(1)
 
                 if steps % self.n_step_eval == 0:
                     # eval
@@ -1595,28 +1597,32 @@ class MetatuneBERT(BaseTrainer):
 
                     # checkpointing (only best_val)
                     if f1_score > best_f1:
-                        self.save_model(save_path)
+                        accelerator.save_state(save_path)
                         best_f1 = f1_score
                         self.logger.info("New save with f1 = {}".format(best_f1))
+                        no_improvement = 0
 
                     if f1_score < best_f1:
                         no_improvement += 1
                         if no_improvement >= self.stagnation_threshold:
+                            self.logger.info("inner training loop launched")
 
                             # inner training loop @HERE
 
-                            # reload last best weights, improve this by simply caching the weights to memory during runtime
-                            self.model = AutoModelForQuestionAnswering.from_pretrained(
-                                save_path
-                            )
+                            # reload last best weights, improve this by simply caching the weights to memory during
+                            # runtime @TODO (if saved from checkpoint, breaks because off accelerator.)
+                            accelerator.load_state(save_path)
+
                             n_updates = self.n_step_nudge
-                            for steps, batch in enumerate(self.train_dataloader):
-                                if steps < n_step_small:
+                            for inner_steps, inner_batch in enumerate(
+                                self.train_dataloader
+                            ):
+                                if inner_steps < n_step_small:
                                     continue
                                 else:
                                     if n_updates > 0:
                                         n_updates -= 1
-                                        outputs = self.model(**batch)
+                                        outputs = self.model(**inner_batch)
                                         loss = outputs.loss
                                         accelerator.backward(loss)
                                         losses["train"].append(
@@ -1625,7 +1631,8 @@ class MetatuneBERT(BaseTrainer):
                                         optimizer.step()
                                         if self.lr_scheduler:
                                             lr_scheduler.step()
-                                            optimizer.zero_grad()
+                                        optimizer.zero_grad()
+                                        print(n_updates)
 
                                 n_step_small += 1
 
@@ -1643,12 +1650,12 @@ class MetatuneBERT(BaseTrainer):
 
                             # checkpointing (only best_val)
                             if f1_score > best_f1:
-                                self.save_model(save_path)
+                                accelerator.save_state(save_path)
                                 best_f1 = f1_score
                                 self.logger.info(
                                     "New save with f1 = {}".format(best_f1)
                                 )
-
+                progressbar.update(1)
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )
