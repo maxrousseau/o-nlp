@@ -1429,7 +1429,7 @@ class MetatuneBERT(BaseTrainer):
     """ """
 
     def __init__(
-        self, config, n_step_eval=200, stagnation_threshold=2, n_steps_nudge=4
+        self, config, n_step_eval=200, stagnation_threshold=2, n_steps_nudge=1
     ):
         super().__init__(config)
         self.big_dataset = config.big_dataset
