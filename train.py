@@ -15,6 +15,7 @@ from mage.generator import TacomaCollator
 
 from transformers import (
     get_scheduler,
+    get_constant_schedule_with_warmup,
     DataCollatorForSeq2Seq,
     default_data_collator,
     AutoModelForQuestionAnswering,
@@ -1531,12 +1532,15 @@ class MetatuneBERT(BaseTrainer):
 
         # accelerator
         if self.lr_scheduler:
-            lr_scheduler = get_scheduler(
-                "linear",
+            lr_scheduler = get_constant_schedule_with_warmup(
                 optimizer=optimizer,
                 num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
+            # lr_scheduler = get_scheduler(
+            #     "linear",
+            #
+            # )
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
