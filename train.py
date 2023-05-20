@@ -1499,7 +1499,7 @@ class MetatuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=4,
             shuffle=False,
         )
 
