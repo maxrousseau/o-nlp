@@ -1476,7 +1476,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=4,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1488,7 +1488,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=4,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1499,7 +1499,7 @@ class MetatuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=16,
+            batch_size=8,
             shuffle=False,
         )
 
@@ -1582,11 +1582,11 @@ class MetatuneBERT(BaseTrainer):
                 l_diff = loss_big - outputs.loss
                 # if batches of difference sizes normalize small loss according to batch size
                 if l_diff > 1:
-                    loss = outputs.loss * torch.abs(torch.pow(l_diff, 3))
+                    loss = (loss_big + outputs.loss) * torch.abs(torch.pow(l_diff, 2))
                 if l_diff < -1:
-                    loss = loss_big * torch.abs(torch.pow(l_diff, 3))
+                    loss = (loss_big + outputs.loss) * torch.abs(torch.pow(l_diff, 2))
                 else:
-                    loss = loss_big
+                    loss = loss_big + outputs.loss
                     # consider noramlizing small loss with respect to batch size?...
 
                 accelerator.backward(loss)
