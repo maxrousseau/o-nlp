@@ -1475,7 +1475,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=2,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1487,7 +1487,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=14,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1576,7 +1576,9 @@ class MetatuneBERT(BaseTrainer):
 
                 target_batch = next(train_iterator)
                 outputs = self.model(**target_batch)
-                l_diff = torch.pow((loss_big - outputs.loss), 2)
+                l_diff = torch.pow(
+                    (loss_big - (outputs.loss * 7)), 2
+                )  # normalize small loss according to batch size
                 if l_diff > 1:
                     loss = (loss_big + outputs.loss) * l_diff
                 else:
