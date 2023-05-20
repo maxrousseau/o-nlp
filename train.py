@@ -1544,6 +1544,7 @@ class MetatuneBERT(BaseTrainer):
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
             accelerator = Accelerator(mixed_precision="fp16")
+            accelerator.distributed_type("MULTI_GPU")
             (
                 self.model,
                 optimizer,
