@@ -220,7 +220,7 @@ def main(argv):
             train_ds_path, val_ds_path, config, only_head=FLAGS.only_cls_head
         )
         tuner = MetatuneBERT(
-            config, n_step_eval=200, stagnation_threshold=3, n_steps_nudge=4
+            config, n_step_eval=200, stagnation_threshold=2, n_steps_nudge=4
         )
         tuner()
 

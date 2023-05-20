@@ -1475,7 +1475,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=2,
+            batch_size=8,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1487,7 +1487,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=14,
+            batch_size=8,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1576,13 +1576,15 @@ class MetatuneBERT(BaseTrainer):
 
                 target_batch = next(train_iterator)
                 outputs = self.model(**target_batch)
-                l_diff = torch.pow(
-                    (loss_big - (outputs.loss * 7)), 2
-                )  # normalize small loss according to batch size
+                l_diff = loss_big - outputs.loss
+                # if batches of difference sizes normalize small loss according to batch size
                 if l_diff > 1:
-                    loss = (loss_big + outputs.loss) * l_diff
+                    loss = outputs.loss * torch.pow(l_diff, 2)
+                if l_diff < 0:
+                    loss = loss_big * torch.pow(l_diff, 2)
                 else:
-                    loss = loss_big + outputs.loss
+                    loss = loss_big
+                    # consider noramlizing small loss with respect to batch size?...
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
@@ -1621,14 +1623,16 @@ class MetatuneBERT(BaseTrainer):
 
                             # reload last best weights, improve this by simply caching the weights to memory during
                             # runtime @TODO (if saved from checkpoint, breaks because off accelerator.)
-                            accelerator.load_state(save_path)
+                            # accelerator.load_state(save_path) #@HERE test without resetting
 
                             n_updates = self.n_step_nudge
                             while n_updates > 0:
                                 n_updates -= 1
                                 target_batch = next(train_iterator)
                                 outputs = self.model(**target_batch)
-                                loss = outputs.loss
+
+                                # when nudging - regularize with big dataset # @todo
+
                                 accelerator.backward(loss)
                                 losses["train"].append(loss.detach().cpu().numpy())
                                 optimizer.step()
