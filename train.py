@@ -1578,7 +1578,7 @@ class MetatuneBERT(BaseTrainer):
                 outputs = self.model(**target_batch)
                 l_diff = torch.pow((loss_big - outputs.loss), 2)
                 if l_diff > 1:
-                    loss = loss_big + loss * (l_diff)
+                    loss = (loss_big + loss) * l_diff
                 else:
                     loss = loss_big + loss
 
