@@ -1535,7 +1535,6 @@ class MetatuneBERT(BaseTrainer):
             lr_scheduler = get_constant_schedule_with_warmup(
                 optimizer=optimizer,
                 num_warmup_steps=0.1 * num_training_steps,
-                num_training_steps=num_training_steps,
             )
             # lr_scheduler = get_scheduler(
             #     "linear",
