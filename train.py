@@ -1499,7 +1499,7 @@ class MetatuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=2,
+            batch_size=4,
             shuffle=False,
         )
 
@@ -1576,6 +1576,8 @@ class MetatuneBERT(BaseTrainer):
 
                 outputs = self.model(**batch)
                 loss_big = outputs.loss
+                del batch
+                torch.cuda.empty_cache()
 
                 target_batch = next(train_iterator)
                 outputs = self.model(**target_batch)
