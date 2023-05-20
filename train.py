@@ -1576,7 +1576,7 @@ class MetatuneBERT(BaseTrainer):
 
                 target_batch = next(train_iterator)
                 outputs = self.model(**target_batch)
-                loss = loss_big + outputs.loss
+                loss = loss_big * torch.pow((loss_big - outputs.loss), 2)
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
