@@ -1587,11 +1587,11 @@ class MetatuneBERT(BaseTrainer):
                 # reg = torch.abs(l_diff)
                 reg = torch.abs(torch.pow(l_diff, 2))
                 if l_diff > 1:
-                    loss = (3 * outputs.loss * reg) + l_diff
+                    loss = (3 * outputs.loss * reg) + loss_big
                 # if l_diff < -1:
                 #    loss = (loss_big + outputs.loss) * torch.abs(torch.pow(l_diff, 2))
                 else:
-                    loss = outputs.loss
+                    loss = 3 * outputs.loss + loss_big
                     # consider noramlizing small loss with respect to batch size?...
 
                 accelerator.backward(loss)
