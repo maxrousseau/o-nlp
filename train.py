@@ -1453,9 +1453,10 @@ class MetatuneBERT(BaseTrainer):
 
         for batch in tqdm(self.val_dataloader):
             outputs = self.model(**batch)
+            loss = outputs.loss
             start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
             end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
-            val_losses.append(outputs.loss.detach().cpu().numpy())
+            val_losses.append(loss.detach().cpu().numpy())
 
         start_logits = np.concatenate(start_logits)
         end_logits = np.concatenate(end_logits)
@@ -1595,7 +1596,7 @@ class MetatuneBERT(BaseTrainer):
                 # @TODO :: we let the model overfit first then we regularize to improve...
                 if l_diff > self.small_batch_size:
                     reg = outputs.loss * torch.abs(
-                        l_diff, 2
+                        torch.pow(l_diff, 2)
                     )  # depending on the threshold maybe pow is not necessary?
                     loss = outputs.loss + reg
 
