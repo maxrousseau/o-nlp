@@ -1476,7 +1476,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=4,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1488,7 +1488,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=16,
+            batch_size=12,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1544,7 +1544,7 @@ class MetatuneBERT(BaseTrainer):
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
             accelerator = Accelerator(mixed_precision="fp16")
-            accelerator.distributed_type("MULTI_GPU")
+            # accelerator.distributed_type("MULTI_GPU")
             (
                 self.model,
                 optimizer,
