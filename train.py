@@ -1438,6 +1438,10 @@ class MetatuneBERT(BaseTrainer):
         self.stagnation_threshold = stagnation_threshold
         self.n_step_nudge = n_steps_nudge
 
+        self.big_batch_size = 14
+        self.small_batch_size = 2
+        self.val_batch_size = 16
+
     @torch.no_grad()
     def __eval(self, accelerator):
         """ """
@@ -1445,11 +1449,13 @@ class MetatuneBERT(BaseTrainer):
         end_logits = []
 
         self.model.eval()
+        val_losses = []
 
         for batch in tqdm(self.val_dataloader):
             outputs = self.model(**batch)
             start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
             end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
+            val_losses.append(outputs.loss.detach().cpu().numpy())
 
         start_logits = np.concatenate(start_logits)
         end_logits = np.concatenate(end_logits)
@@ -1466,7 +1472,7 @@ class MetatuneBERT(BaseTrainer):
         f1_score = metrics["f1"]
         accelerator.wait_for_everyone()
         self.model.train()
-        return f1_score
+        return f1_score, np.array(val_losses).mean()
 
     def __get_dataloaders(self):
         """"""
@@ -1476,7 +1482,7 @@ class MetatuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=4,
+            batch_size=self.small_batch_size,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1488,7 +1494,7 @@ class MetatuneBERT(BaseTrainer):
             big_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=12,
+            batch_size=self.big_batch_size,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1499,7 +1505,7 @@ class MetatuneBERT(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=default_data_collator,
-            batch_size=8,
+            batch_size=self.val_batch_size,
             shuffle=False,
         )
 
@@ -1582,11 +1588,15 @@ class MetatuneBERT(BaseTrainer):
 
                 target_batch = next(train_iterator)
                 outputs = self.model(**target_batch)
-                l_diff = loss_big - (3 * outputs.loss)
+                l_diff = (loss_big / self.big_batch_size) - (
+                    outputs.loss / self.small_batch_size
+                ) * (self.small_batch_size)
 
                 # @TODO :: we let the model overfit first then we regularize to improve...
-                if l_diff > 4:
-                    reg = outputs.loss * torch.abs(torch.pow(l_diff, 2))
+                if l_diff > self.small_batch_size:
+                    reg = outputs.loss * torch.abs(
+                        l_diff, 2
+                    )  # depending on the threshold maybe pow is not necessary?
                     loss = outputs.loss + reg
 
                 else:
@@ -1602,12 +1612,13 @@ class MetatuneBERT(BaseTrainer):
 
                 if steps % self.n_step_eval == 0:
                     # eval
-                    f1_score = self.__eval(accelerator)
+                    f1_score, val_loss = self.__eval(accelerator)
                     self.logger.info("steps {} : f1 {}".format(steps, f1_score))
                     wandb.log(
                         {
                             "val_f1": f1_score,
                             "train_loss": np.array(losses["train"]).mean(),
+                            "val_loss": val_loss,
                             "n_step": steps,
                         }
                     )
@@ -1665,6 +1676,7 @@ class MetatuneBERT(BaseTrainer):
                                 self.logger.info(
                                     "New save with f1 = {}".format(best_f1)
                                 )
+                # save last model...?
                 progressbar.update(1)
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
