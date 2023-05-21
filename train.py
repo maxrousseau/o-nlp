@@ -1585,15 +1585,13 @@ class MetatuneBERT(BaseTrainer):
                 l_diff = loss_big - (3 * outputs.loss)
                 # if batches of difference sizes normalize small loss according to batch size
                 # reg = torch.abs(l_diff)
-                reg = outputs.loss * torch.abs(torch.pow(l_diff, 2))
-                # if l_diff > 1:
-                #    loss = (3 * outputs.loss * reg) + loss_big
-                # if l_diff < -1:
-                #    loss = (loss_big + outputs.loss) * torch.abs(torch.pow(l_diff, 2))
-                # else:
-                # loss = 3 * outputs.loss + loss_big
+                if l_diff > 1:
+                    reg = outputs.loss * torch.abs(torch.pow(l_diff, 2))
+                    loss = outputs.loss + reg
+
+                else:
+                    loss = outputs.loss
                 # consider noramlizing small loss with respect to batch size?...
-                loss = outputs.loss + reg
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
