@@ -1449,14 +1449,12 @@ class MetatuneBERT(BaseTrainer):
         end_logits = []
 
         self.model.eval()
-        val_losses = []
 
         for batch in tqdm(self.val_dataloader):
             outputs = self.model(**batch)
-            loss = outputs.loss
+
             start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
             end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
-            val_losses.append(loss.detach().cpu().numpy())
 
         start_logits = np.concatenate(start_logits)
         end_logits = np.concatenate(end_logits)
@@ -1473,7 +1471,7 @@ class MetatuneBERT(BaseTrainer):
         f1_score = metrics["f1"]
         accelerator.wait_for_everyone()
         self.model.train()
-        return f1_score, np.array(val_losses).mean()
+        return f1_score
 
     def __get_dataloaders(self):
         """"""
@@ -1613,13 +1611,12 @@ class MetatuneBERT(BaseTrainer):
 
                 if steps % self.n_step_eval == 0:
                     # eval
-                    f1_score, val_loss = self.__eval(accelerator)
+                    f1_score = self.__eval(accelerator)
                     self.logger.info("steps {} : f1 {}".format(steps, f1_score))
                     wandb.log(
                         {
                             "val_f1": f1_score,
                             "train_loss": np.array(losses["train"]).mean(),
-                            "val_loss": val_loss,
                             "n_step": steps,
                         }
                     )
