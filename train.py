@@ -1584,7 +1584,8 @@ class MetatuneBERT(BaseTrainer):
                 outputs = self.model(**target_batch)
                 l_diff = loss_big - (3 * outputs.loss)
 
-                if l_diff > 2:
+                # @TODO :: we let the model overfit first then we regularize to improve...
+                if l_diff > 4:
                     reg = outputs.loss * torch.abs(torch.pow(l_diff, 2))
                     loss = outputs.loss + reg
 
