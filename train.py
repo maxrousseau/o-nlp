@@ -1629,34 +1629,35 @@ class MetatuneBERT(BaseTrainer):
                 if self.lr_scheduler:
                     lr_scheduler.step()
                 optimizer.zero_grad()
+
                 progressbar.update(1)
 
-        # eval
-        f1_score, val_loss = self.__eval(accelerator)
-        self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-        wandb.log(
-            {
-                "val_f1": f1_score,
-                "val_loss": val_loss,
-                "train_loss": np.array(losses["train"]).mean(),
-                "n_step": steps,
-                "n_epoch": epoch,
-            }
-        )
-
-        # checkpointing (only best_val)
-        if val_loss < lowest_val:
-            # accelerator.save_state(save_path)
-            self.save_model(save_path)
-            lowest_val = val_loss
-            best_f1 = f1_score
-            best_val = val_loss
-            self.logger.info(
-                "New save with f1 = {}, val_loss = {} @ {}".format(
-                    best_f1, val_loss, save_path
-                )
+            # eval
+            f1_score, val_loss = self.__eval(accelerator)
+            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+            wandb.log(
+                {
+                    "val_f1": f1_score,
+                    "val_loss": val_loss,
+                    "train_loss": np.array(losses["train"]).mean(),
+                    "n_step": steps,
+                    "n_epoch": epoch,
+                }
             )
-        # save last model...?
+
+            # checkpointing (only best_val)
+            if val_loss < lowest_val:
+                # accelerator.save_state(save_path)
+                self.save_model(save_path)
+                lowest_val = val_loss
+                best_f1 = f1_score
+                best_val = val_loss
+                self.logger.info(
+                    "New save with f1 = {}, val_loss = {} @ {}".format(
+                        best_f1, val_loss, save_path
+                    )
+                )
+            # save last model...?
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
