@@ -1535,7 +1535,7 @@ class MetatuneBERT(BaseTrainer):
         best_f1 = -1
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_steps_per_epoch_big = len(self.big_dataloader)
-        num_steps_per_epoch_small = self.train_dataloader
+        num_steps_per_epoch_small = len(self.train_dataloader)
 
         self.n_step_eval = num_steps_per_epoch_small
 
