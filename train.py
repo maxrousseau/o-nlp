@@ -1442,6 +1442,8 @@ class MetatuneBERT(BaseTrainer):
         self.small_batch_size = 2
         self.val_batch_size = 16
 
+        self.threshold = 2
+
     @torch.no_grad()
     def __eval(self, accelerator):
         """ """
@@ -1591,8 +1593,10 @@ class MetatuneBERT(BaseTrainer):
                     outputs.loss / self.small_batch_size
                 ) * (self.small_batch_size)
 
+                t = self.small_batch_size * self.threshold
+
                 # @TODO :: we let the model overfit first then we regularize to improve...
-                if l_diff > self.small_batch_size:
+                if l_diff > t:
                     reg = outputs.loss * torch.abs(
                         # torch.pow(l_diff, 2)
                         l_diff
