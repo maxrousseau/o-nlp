@@ -1606,7 +1606,7 @@ class MetatuneBERT(BaseTrainer):
                 t = self.small_batch_size * self.threshold
 
                 # @TODO :: we let the model overfit first then we regularize to improve...
-                if l_diff > 0:
+                if l_diff > 0.0:
                     reg = outputs.loss * torch.abs(
                         # torch.pow(l_diff, 2)
                         l_diff
@@ -1615,6 +1615,8 @@ class MetatuneBERT(BaseTrainer):
 
                 else:
                     loss = outputs.loss
+
+                loss = outputs.loss
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
