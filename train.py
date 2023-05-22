@@ -1183,7 +1183,7 @@ class EvaluateBERT(BaseTester):
         self.__get_dataloader()
 
         # run inference on batch
-        accelerator = Accelerator()
+        accelerator = Accelerator(mixed_precision="fp16")
         (
             self.model,
             self.test_dataloader,
