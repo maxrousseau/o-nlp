@@ -1438,11 +1438,11 @@ class MetatuneBERT(BaseTrainer):
         self.stagnation_threshold = stagnation_threshold
         self.n_step_nudge = n_steps_nudge
 
-        self.big_batch_size = 10
-        self.small_batch_size = 6
+        self.big_batch_size = 12
+        self.small_batch_size = 4
         self.val_batch_size = 16
 
-        self.threshold = 2
+        self.threshold = 4
 
     @torch.no_grad()
     def __eval(self, accelerator):
