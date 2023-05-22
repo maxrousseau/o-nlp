@@ -1632,7 +1632,8 @@ class MetatuneBERT(BaseTrainer):
 
                     # checkpointing (only best_val)
                     if f1_score > best_f1:
-                        accelerator.save_state(save_path)
+                        # accelerator.save_state(save_path)
+                        self.save_model(save_path)
                         best_f1 = f1_score
                         self.logger.info("New save with f1 = {}".format(best_f1))
                         no_improvement = 0
