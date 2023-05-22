@@ -1582,42 +1582,43 @@ class MetatuneBERT(BaseTrainer):
 
         losses = {"train": []}
 
-        train_iterator = itertools.cycle(self.train_dataloader)
+        big_iterator = itertools.cycle(self.big_dataloader)
 
         # training loop
         progressbar = tqdm(range(num_training_steps))
 
         # outer loop
         for epoch in range(self.num_epochs):
-
-            for steps, batch in enumerate(self.big_dataloader):
-
-                self.model.eval()
+            self.model.train()
+            for steps, batch in enumerate(self.train_dataloader):
 
                 outputs = self.model(**batch)
-                loss_big = outputs.loss
-                del batch
-                torch.cuda.empty_cache()
-                self.model.train()
+                loss = outputs.loss
 
-                target_batch = next(train_iterator)
-                outputs = self.model(**target_batch)
-                l_diff = (loss_big / self.big_batch_size) - (
-                    outputs.loss / self.small_batch_size
-                ) * (self.small_batch_size)
-
-                t = self.small_batch_size * self.threshold
-
-                # @TODO :: we let the model overfit first then we regularize to improve...
-                if l_diff > 0.0:
-                    reg = outputs.loss * torch.abs(
-                        # torch.pow(l_diff, 2)
-                        l_diff
-                    )  # depending on the threshold maybe pow is not necessary?
-                    loss = outputs.loss + reg
-
-                else:
-                    loss = outputs.loss
+                # self.model.eval()
+                # reg_batch = next(big_iterator)
+                # outputs = self.model(**reg_batch)
+                # loss_big = outputs.loss
+                # del batch
+                # torch.cuda.empty_cache()
+                # self.model.train()
+                #
+                # l_diff = (loss_big / self.big_batch_size) - (
+                #    outputs.loss / self.small_batch_size
+                # ) * (self.small_batch_size)
+                #
+                # t = self.small_batch_size * self.threshold
+                #
+                ## @TODO :: we let the model overfit first then we regularize to improve...
+                # if l_diff > 0.0:
+                #    reg = outputs.loss * torch.abs(
+                #        # torch.pow(l_diff, 2)
+                #        l_diff
+                #    )  # depending on the threshold maybe pow is not necessary?
+                #    loss = outputs.loss + reg
+                #
+                # else:
+                #    loss = outputs.loss
 
                 loss = outputs.loss
 
@@ -1629,32 +1630,30 @@ class MetatuneBERT(BaseTrainer):
                     lr_scheduler.step()
                 optimizer.zero_grad()
 
-                if steps % self.n_step_eval == 0:
-                    # eval
-                    f1_score, val_loss = self.__eval(accelerator)
-                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-                    wandb.log(
-                        {
-                            "val_f1": f1_score,
-                            "val_loss": val_loss,
-                            "train_loss": np.array(losses["train"]).mean(),
-                            "n_step": steps,
-                        }
-                    )
+                # eval
+                f1_score, val_loss = self.__eval(accelerator)
+                self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+                wandb.log(
+                    {
+                        "val_f1": f1_score,
+                        "val_loss": val_loss,
+                        "train_loss": np.array(losses["train"]).mean(),
+                        "n_step": steps,
+                    }
+                )
 
-                    # checkpointing (only best_val)
-                    if val_loss < lowest_val:
-                        # accelerator.save_state(save_path)
-                        self.save_model(save_path)
-                        lowest_val = val_loss
-                        best_f1 = f1_score
-                        best_val = val_loss
-                        self.logger.info(
-                            "New save with f1 = {}, val_loss = {} @ {}".format(
-                                best_f1, val_loss, save_path
-                            )
+                # checkpointing (only best_val)
+                if val_loss < lowest_val:
+                    # accelerator.save_state(save_path)
+                    self.save_model(save_path)
+                    lowest_val = val_loss
+                    best_f1 = f1_score
+                    best_val = val_loss
+                    self.logger.info(
+                        "New save with f1 = {}, val_loss = {} @ {}".format(
+                            best_f1, val_loss, save_path
                         )
-
+                    )
                 # save last model...?
                 progressbar.update(1)
         self.logger.info(
