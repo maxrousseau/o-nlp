@@ -1438,7 +1438,7 @@ class MetatuneBERT(BaseTrainer):
         self.stagnation_threshold = stagnation_threshold
         self.n_step_nudge = n_steps_nudge
 
-        self.big_batch_size = 12
+        self.big_batch_size = 10
         self.small_batch_size = 6
         self.val_batch_size = 16
 
