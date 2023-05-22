@@ -1442,7 +1442,7 @@ class MetatuneBERT(BaseTrainer):
         self.small_batch_size = 2
         self.val_batch_size = 16
 
-        self.threshold = 2
+        self.threshold = 4
 
     @torch.no_grad()
     def __eval(self, accelerator):
