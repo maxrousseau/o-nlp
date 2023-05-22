@@ -1442,7 +1442,7 @@ class MetatuneBERT(BaseTrainer):
         self.small_batch_size = 4
         self.val_batch_size = 16
 
-        self.threshold = 4
+        self.threshold = 1
 
     @torch.no_grad()
     def __eval(self, accelerator):
@@ -1606,7 +1606,7 @@ class MetatuneBERT(BaseTrainer):
                 t = self.small_batch_size * self.threshold
 
                 # @TODO :: we let the model overfit first then we regularize to improve...
-                if l_diff > t:
+                if l_diff > 0:
                     reg = outputs.loss * torch.abs(
                         torch.pow(l_diff, 2)
                         # l_diff
@@ -1641,6 +1641,7 @@ class MetatuneBERT(BaseTrainer):
                     if val_loss < lowest_val:
                         # accelerator.save_state(save_path)
                         self.save_model(save_path)
+                        lowest_val = val_loss
                         best_f1 = f1_score
                         best_val = val_loss
                         self.logger.info(
