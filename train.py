@@ -1619,8 +1619,9 @@ class MetatuneBERT(BaseTrainer):
                 #
                 # else:
                 #     loss = outputs.loss
-
-                reg = loss_small * torch.pow(l_diff, 2)
+                reg = 0
+                if l_diff >= 0:
+                    reg = loss_small * torch.abs(l_diff)
 
                 loss = loss_small + reg
 
