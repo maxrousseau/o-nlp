@@ -737,8 +737,11 @@ class FinetuneBERT(BaseTrainer):
         return f1_score
 
     def __get_dataloaders(self):
+
         """"""
-        train_tensor = self.train_batches
+        train_tensor = self.train_batches.remove_columns(
+            ["example_id", "offset_mapping"]
+        )
         train_tensor.set_format("torch")
         self.train_dataloader = DataLoader(
             train_tensor,
