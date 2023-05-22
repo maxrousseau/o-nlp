@@ -1439,10 +1439,10 @@ class MetatuneBERT(BaseTrainer):
         self.n_step_nudge = n_steps_nudge
 
         self.big_batch_size = 12
-        self.small_batch_size = 2
+        self.small_batch_size = 6
         self.val_batch_size = 16
 
-        self.threshold = 4
+        self.threshold = 2
 
     @torch.no_grad()
     def __eval(self, accelerator):
@@ -1535,6 +1535,10 @@ class MetatuneBERT(BaseTrainer):
         best_f1 = -1
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_steps_per_epoch_big = len(self.big_dataloader)
+        num_steps_per_epoch_small = self.train_dataloader
+
+        self.n_step_eval = num_steps_per_epoch_small
+
         num_training_steps = self.num_epochs * num_steps_per_epoch_big
 
         # accelerator
@@ -1598,8 +1602,8 @@ class MetatuneBERT(BaseTrainer):
                 # @TODO :: we let the model overfit first then we regularize to improve...
                 if l_diff > t:
                     reg = outputs.loss * torch.abs(
-                        # torch.pow(l_diff, 2)
-                        l_diff
+                        torch.pow(l_diff, 2)
+                        # l_diff
                     )  # depending on the threshold maybe pow is not necessary?
                     loss = outputs.loss + reg
 
