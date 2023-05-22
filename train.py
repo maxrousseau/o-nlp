@@ -1438,8 +1438,8 @@ class MetatuneBERT(BaseTrainer):
         self.stagnation_threshold = stagnation_threshold
         self.n_step_nudge = n_steps_nudge
 
-        self.big_batch_size = 8
-        self.small_batch_size = 8
+        self.big_batch_size = 12
+        self.small_batch_size = 4
         self.val_batch_size = 16
 
         self.threshold = 1
@@ -1593,34 +1593,36 @@ class MetatuneBERT(BaseTrainer):
             for steps, batch in enumerate(self.train_dataloader):
 
                 outputs = self.model(**batch)
-                loss = outputs.loss
+                loss_small = outputs.loss
 
-                # self.model.eval()
-                # reg_batch = next(big_iterator)
-                # outputs = self.model(**reg_batch)
-                # loss_big = outputs.loss
-                # del batch
-                # torch.cuda.empty_cache()
-                # self.model.train()
-                #
-                # l_diff = (loss_big / self.big_batch_size) - (
-                #    outputs.loss / self.small_batch_size
-                # ) * (self.small_batch_size)
-                #
+                self.model.eval()
+                reg_batch = next(big_iterator)
+                outputs = self.model(**reg_batch)
+                loss_big = outputs.loss
+                del batch
+                torch.cuda.empty_cache()
+                self.model.train()
+
+                l_diff = (loss_big / self.big_batch_size) - (
+                    loss_small / self.small_batch_size
+                ) * (self.small_batch_size)
+
                 # t = self.small_batch_size * self.threshold
                 #
-                ## @TODO :: we let the model overfit first then we regularize to improve...
+                # # @TODO :: we let the model overfit first then we regularize to improve...
                 # if l_diff > 0.0:
-                #    reg = outputs.loss * torch.abs(
-                #        # torch.pow(l_diff, 2)
-                #        l_diff
-                #    )  # depending on the threshold maybe pow is not necessary?
-                #    loss = outputs.loss + reg
+                #     reg = outputs.loss * torch.abs(
+                #         torch.pow(l_diff, 2)
+                #         # l_diff
+                #     )  # depending on the threshold maybe pow is not necessary?
+                #     loss = outputs.loss + reg
                 #
                 # else:
-                #    loss = outputs.loss
+                #     loss = outputs.loss
 
-                loss = outputs.loss
+                reg = loss_small * torch.pow(l_diff, 2)
+
+                loss = loss_small + reg
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
