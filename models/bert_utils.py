@@ -116,7 +116,7 @@ def preprocess_training(
         padding="max_length",
     )
 
-    offset_mapping = inputs.pop("offset_mapping")
+    offset_mapping = inputs["offset_mapping"]
     sample_map = inputs.pop("overflow_to_sample_mapping")
     answers = examples["answers"]
     start_positions = []
@@ -158,6 +158,20 @@ def preprocess_training(
 
     inputs["start_positions"] = start_positions
     inputs["end_positions"] = end_positions
+
+    example_ids = []
+
+    for i in range(len(inputs["input_ids"])):
+        sample_idx = sample_map[i]
+        example_ids.append(examples["id"][sample_idx])
+
+        sequence_ids = inputs.sequence_ids(i)
+        offset = inputs["offset_mapping"][i]
+        inputs["offset_mapping"][i] = [
+            o if sequence_ids[k] == 1 else None for k, o in enumerate(offset)
+        ]
+
+    inputs["example_id"] = example_ids
 
     return inputs
 
@@ -268,7 +282,12 @@ def answer_from_logits(start_logits, end_logits, features, examples, tokenizer):
 
 
 def prepare_inputs(
-    dataset, tokenizer, stride, max_len, subset=None, padding="max_length"
+    dataset,
+    tokenizer,
+    stride,
+    max_len,
+    subset=None,
+    padding="max_length",
 ):
     """ """
     if subset == "train":
@@ -458,9 +477,9 @@ def setup_metatune(train_path, val_path, config, only_head=False):
     squad = load_dataset(
         "squad",
     )  # @BUG remove for caching
-    config.big_dataset = squad["train"]
-    config.train_dataset = Dataset.load_from_disk(train_path)
-    config.val_dataset = Dataset.load_from_disk(val_path)
+    config.big_dataset = squad["train"].select(range(16))
+    config.train_dataset = Dataset.load_from_disk(train_path).select(range(16))
+    config.val_dataset = Dataset.load_from_disk(val_path).select(range(16))
 
     # !bert
 
@@ -503,7 +522,7 @@ def setup_metatune(train_path, val_path, config, only_head=False):
         stride=config.stride,
         max_len=config.max_length,
         padding=config.padding,
-        subset="eval",
+        subset="train",
     )
 
     return config

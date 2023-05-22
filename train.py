@@ -1452,12 +1452,15 @@ class MetatuneBERT(BaseTrainer):
 
         self.model.eval()
 
+        val_loss = []
+
         for batch in tqdm(self.val_dataloader):
             outputs = self.model(**batch)
 
             start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
             end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
 
+            val_loss.append(outputs.loss.detach().cpu().numpy())
         start_logits = np.concatenate(start_logits)
         end_logits = np.concatenate(end_logits)
         start_logits = start_logits[: len(self.val_batches)]
@@ -1471,13 +1474,16 @@ class MetatuneBERT(BaseTrainer):
             self.tokenizer,
         )
         f1_score = metrics["f1"]
+        val_loss = np.array(val_loss).mean()
         accelerator.wait_for_everyone()
         self.model.train()
-        return f1_score
+        return f1_score, val_loss
 
     def __get_dataloaders(self):
         """"""
-        train_tensor = self.train_batches
+        train_tensor = self.train_batches.remove_columns(
+            ["example_id", "offset_mapping"]
+        )
         train_tensor.set_format("torch")
         self.train_dataloader = DataLoader(
             train_tensor,
@@ -1489,7 +1495,7 @@ class MetatuneBERT(BaseTrainer):
             generator=self.g,
         )
 
-        big_tensor = self.big_batches
+        big_tensor = self.big_batches.remove_columns(["example_id", "offset_mapping"])
         big_tensor.set_format("torch")
         self.big_dataloader = DataLoader(
             big_tensor,
@@ -1502,6 +1508,7 @@ class MetatuneBERT(BaseTrainer):
         )
 
         val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
+        #    val_tensor = self.val_batches
         val_tensor.set_format("torch")
         self.val_dataloader = DataLoader(
             val_tensor,
@@ -1533,6 +1540,7 @@ class MetatuneBERT(BaseTrainer):
         )
 
         best_f1 = -1
+        lowest_val = 100
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
         num_steps_per_epoch_big = len(self.big_dataloader)
         num_steps_per_epoch_small = len(self.train_dataloader)
@@ -1576,8 +1584,6 @@ class MetatuneBERT(BaseTrainer):
 
         train_iterator = itertools.cycle(self.train_dataloader)
 
-        no_improvement = 0
-
         # training loop
         progressbar = tqdm(range(num_training_steps))
 
@@ -1620,70 +1626,29 @@ class MetatuneBERT(BaseTrainer):
 
                 if steps % self.n_step_eval == 0:
                     # eval
-                    f1_score = self.__eval(accelerator)
+                    f1_score, val_loss = self.__eval(accelerator)
                     self.logger.info("steps {} : f1 {}".format(steps, f1_score))
                     wandb.log(
                         {
                             "val_f1": f1_score,
+                            "val_loss": val_loss,
                             "train_loss": np.array(losses["train"]).mean(),
                             "n_step": steps,
                         }
                     )
 
                     # checkpointing (only best_val)
-                    if f1_score > best_f1:
+                    if val_loss < lowest_val:
                         # accelerator.save_state(save_path)
                         self.save_model(save_path)
                         best_f1 = f1_score
-                        self.logger.info("New save with f1 = {}".format(best_f1))
-                        no_improvement = 0
-
-                    # if f1_score < best_f1:
-                    if False:  # debug
-                        no_improvement += 1
-                        if no_improvement >= self.stagnation_threshold:
-                            self.logger.info("inner training loop launched")
-
-                            # inner training loop @HERE
-
-                            # reload last best weights, improve this by simply caching the weights to memory during
-                            # runtime @TODO (if saved from checkpoint, breaks because off accelerator.)
-                            # accelerator.load_state(save_path) #@HERE test without resetting
-
-                            n_updates = self.n_step_nudge
-                            while n_updates > 0:
-                                n_updates -= 1
-                                target_batch = next(train_iterator)
-                                outputs = self.model(**target_batch)
-
-                                # when nudging - regularize with big dataset # @todo
-
-                                accelerator.backward(loss)
-                                losses["train"].append(loss.detach().cpu().numpy())
-                                optimizer.step()
-                                if self.lr_scheduler:
-                                    lr_scheduler.step()
-                                optimizer.zero_grad()
-
-                            # reset no_improvement
-                            no_improvement = 0
-                            f1_score = self.__eval(accelerator)
-                            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-                            wandb.log(
-                                {
-                                    "val_f1": f1_score,
-                                    "train_loss": np.array(losses["train"]).mean(),
-                                    "n_step": steps + self.n_step_nudge,
-                                }
+                        best_val = val_loss
+                        self.logger.info(
+                            "New save with f1 = {}, val_loss = {} @ {}".format(
+                                best_f1, val_loss, save_path
                             )
+                        )
 
-                            # checkpointing (only best_val)
-                            if f1_score > best_f1:
-                                accelerator.save_state(save_path)
-                                best_f1 = f1_score
-                                self.logger.info(
-                                    "New save with f1 = {}".format(best_f1)
-                                )
                 # save last model...?
                 progressbar.update(1)
         self.logger.info(
