@@ -1608,8 +1608,8 @@ class MetatuneBERT(BaseTrainer):
                 # @TODO :: we let the model overfit first then we regularize to improve...
                 if l_diff > 0:
                     reg = outputs.loss * torch.abs(
-                        torch.pow(l_diff, 2)
-                        # l_diff
+                        # torch.pow(l_diff, 2)
+                        l_diff
                     )  # depending on the threshold maybe pow is not necessary?
                     loss = outputs.loss + reg
 
