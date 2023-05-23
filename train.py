@@ -190,7 +190,7 @@ class FinetuneT5(BaseTrainer):
         for i, batch in enumerate(tqdm(self.val_dataloader)):
             outputs = self.model.generate(
                 **batch,
-                max_length=25,
+                max_length=self.max_ans_length,
                 num_beams=1,
             )
             for i in outputs:
@@ -1610,21 +1610,11 @@ class MetatuneBERT(BaseTrainer):
                     loss_small / self.small_batch_size
                 ) * (self.small_batch_size)
 
-                # t = self.small_batch_size * self.threshold
-                #
-                # # @TODO :: we let the model overfit first then we regularize to improve...
-                # if l_diff > 0.0:
-                #     reg = outputs.loss * torch.abs(
-                #         torch.pow(l_diff, 2)
-                #         # l_diff
-                #     )  # depending on the threshold maybe pow is not necessary?
-                #     loss = outputs.loss + reg
-                #
-                # else:
-                #     loss = outputs.loss
-                reg = 0
-                if l_diff >= 0:
-                    reg = loss_small * torch.abs(l_diff)
+                # reg = 0
+                # if l_diff >= 0:
+                #    reg = loss_small * l_diff
+                # don't really need to worry about above bc we will always converge to
+                reg = loss_small * torch.abs(l_diff)
 
                 loss = loss_small + reg
 
