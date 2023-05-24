@@ -1626,12 +1626,12 @@ class MetatuneBERT(BaseTrainer):
                     - (loss_big / self.big_batch_size)
                 ) * (self.big_batch_size)
 
-                # reg = 0
-                # if l_diff >= 0:
-                #     reg = loss_big * l_diff
+                reg = 0
+                if l_diff >= 0:
+                    reg = l_diff
 
-                # loss = loss_big + reg
-                loss = loss_big
+                loss = loss_big + reg
+                # loss = loss_big
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
