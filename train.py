@@ -1627,8 +1627,8 @@ class MetatuneBERT(BaseTrainer):
                 ) * (self.big_batch_size)
 
                 reg = 0
-                if l_diff >= 0:
-                    reg = l_diff
+                if l_diff >= 1:
+                    reg = torch.sqrt(l_diff)
 
                 loss = loss_big + reg
                 # loss = loss_big
