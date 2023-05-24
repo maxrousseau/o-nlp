@@ -1628,7 +1628,9 @@ class MetatuneBERT(BaseTrainer):
 
                 reg = 0
                 if l_diff >= 1:
-                    reg = torch.sqrt(l_diff)
+                    reg = torch.log(
+                        l_diff
+                    )  # a lighter sqrt regularization seems to help, maybe log would be even better?
 
                 loss = loss_big + reg
                 # loss = loss_big
