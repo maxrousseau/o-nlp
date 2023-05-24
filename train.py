@@ -1607,12 +1607,12 @@ class MetatuneBERT(BaseTrainer):
             for steps, batch in enumerate(self.big_dataloader):
 
                 self.model.eval()
-
-                reg_batch = next(small_iterator)
-                outputs = self.model(**reg_batch)
-                loss_small = outputs.loss
-                del reg_batch
-                torch.cuda.empty_cache()
+                with torch.no_grad():
+                    reg_batch = next(small_iterator)
+                    outputs = self.model(**reg_batch)
+                    loss_small = outputs.loss
+                    del reg_batch
+                    torch.cuda.empty_cache()
 
                 self.model.train()
 
