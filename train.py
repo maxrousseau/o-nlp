@@ -1442,8 +1442,8 @@ class MetatuneBERT(BaseTrainer):
         self.stagnation_threshold = stagnation_threshold
         self.n_step_nudge = n_steps_nudge
 
-        self.big_batch_size = 12
-        self.small_batch_size = 4
+        self.big_batch_size = 16
+        self.small_batch_size = 16
         self.val_batch_size = 16
 
         self.threshold = 1
@@ -1547,22 +1547,31 @@ class MetatuneBERT(BaseTrainer):
         lowest_val = 100
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
 
-        num_steps_per_epoch_small = len(self.train_dataloader)
+        num_steps_per_epoch_small = len(self.big_dataloader)
 
-        self.n_step_eval = num_steps_per_epoch_small
+        # self.n_step_eval = num_steps_per_epoch_small
+        self.n_step_eval = 50
 
         num_training_steps = self.num_epochs * num_steps_per_epoch_small
 
         # accelerator
+        # if self.lr_scheduler:
+        #     lr_scheduler = get_constant_schedule_with_warmup(
+        #         optimizer=optimizer,
+        #         num_warmup_steps=0.1 * num_training_steps,
+        #     )
+        # lr_scheduler = get_scheduler(
+        #     "linear",
+        #
+        # )
+
         if self.lr_scheduler:
-            lr_scheduler = get_constant_schedule_with_warmup(
+            lr_scheduler = get_scheduler(
+                "linear",
                 optimizer=optimizer,
                 num_warmup_steps=0.1 * num_training_steps,
+                num_training_steps=num_training_steps,
             )
-            # lr_scheduler = get_scheduler(
-            #     "linear",
-            #
-            # )
 
         if torch.device != "cpu":
             # @BUG mixed precision breaks generation
@@ -1586,38 +1595,42 @@ class MetatuneBERT(BaseTrainer):
 
         losses = {"train": []}
 
-        big_iterator = itertools.cycle(self.big_dataloader)
+        # big_iterator = itertools.cycle(self.big_dataloader)
+        small_iterator = itertools.cycle(self.train_dataloader)
 
         # training loop
         progressbar = tqdm(range(num_training_steps))
 
         # outer loop
         for epoch in range(self.num_epochs):
-            self.model.train()
-            for steps, batch in enumerate(self.train_dataloader):
 
-                outputs = self.model(**batch)
-                loss_small = outputs.loss
+            for steps, batch in enumerate(self.big_dataloader):
 
                 self.model.eval()
-                reg_batch = next(big_iterator)
+
+                reg_batch = next(small_iterator)
                 outputs = self.model(**reg_batch)
-                loss_big = outputs.loss
-                del batch
+                loss_small = outputs.loss
+                del reg_batch
                 torch.cuda.empty_cache()
+
                 self.model.train()
 
-                l_diff = (loss_big / self.big_batch_size) - (
-                    loss_small / self.small_batch_size
-                ) * (self.small_batch_size)
+                outputs = self.model(**batch)
+                loss_big = outputs.loss
 
-                # reg = 0
-                # if l_diff >= 0:
-                #    reg = loss_small * l_diff
-                # don't really need to worry about above bc we will always converge to
-                reg = loss_small * torch.abs(l_diff)
+                self.model.train()
 
-                loss = loss_small + reg
+                l_diff = (
+                    (loss_small / self.small_batch_size)
+                    - (loss_big / self.big_batch_size)
+                ) * (self.big_batch_size)
+
+                reg = 0
+                if l_diff >= 0:
+                    reg = loss_big * l_diff
+
+                loss = loss_big + reg
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
@@ -1629,29 +1642,31 @@ class MetatuneBERT(BaseTrainer):
 
                 progressbar.update(1)
 
-            # eval
-            f1_score, val_loss = self.__eval(accelerator)
-            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-            wandb.log(
-                {
-                    "val_f1": f1_score,
-                    "val_loss": val_loss,
-                    "train_loss": np.array(losses["train"]).mean(),
-                    "n_step": steps,
-                    "n_epoch": epoch,
-                }
-            )
+                if steps % self.n_step_eval == 0:
 
-            # checkpointing (only best_val)
-            if f1_score > best_f1:
-                # accelerator.save_state(save_path)
-                self.save_model(save_path)
-                best_f1 = f1_score
-                self.logger.info(
-                    "New save with f1 = {}, val_loss = {} @ {}".format(
-                        best_f1, val_loss, save_path
+                    # eval
+                    f1_score, val_loss = self.__eval(accelerator)
+                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+                    wandb.log(
+                        {
+                            "val_f1": f1_score,
+                            "val_loss": val_loss,
+                            "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": steps,
+                            "n_epoch": epoch,
+                        }
                     )
-                )
+
+                    # checkpointing (only best_val)
+                    if f1_score > best_f1:
+                        # accelerator.save_state(save_path)
+                        self.save_model(save_path)
+                        best_f1 = f1_score
+                        self.logger.info(
+                            "New save with f1 = {}, val_loss = {} @ {}".format(
+                                best_f1, val_loss, save_path
+                            )
+                        )
             # save last model...?
 
         self.logger.info(
