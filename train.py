@@ -1528,8 +1528,11 @@ class MetatuneBERT(BaseTrainer):
         # dataloaders
         self.__get_dataloaders()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        f1_save_path = os.path.abspath(
+            "{}-f1-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
+        loss_save_path = os.path.abspath(
+            "{}-val_loss-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         # experiment tracking
@@ -1628,9 +1631,7 @@ class MetatuneBERT(BaseTrainer):
 
                 reg = 0
                 if l_diff >= 1:
-                    reg = torch.log(
-                        l_diff
-                    )  # a lighter sqrt regularization seems to help, maybe log would be even better?
+                    reg = torch.log(l_diff)
 
                 loss = loss_big + reg
                 # loss = loss_big
@@ -1663,19 +1664,23 @@ class MetatuneBERT(BaseTrainer):
                     # checkpointing (only best_val)
                     if f1_score > best_f1:
                         # accelerator.save_state(save_path)
-                        self.save_model(save_path)
+                        self.save_model(f1_save_path)
                         best_f1 = f1_score
                         self.logger.info(
-                            "New save with f1 = {}, val_loss = {} @ {}".format(
-                                best_f1, val_loss, save_path
+                            "New save with f1 = {} @ {}".format(best_f1, f1_save_path)
+                        )
+                    if val_loss < lowest_val:
+                        lowest_val = val_loss
+                        self.save_model(loss_save_path)
+                        best_f1 = f1_score
+                        self.logger.info(
+                            "New save val_loss = {} @ {}".format(
+                                val_loss, loss_save_path
                             )
                         )
-            # save last model...?
-        # final_path = os.path.abspath(
-        #    "{}-FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        # )
-        # self.save_model(final_path)
 
-        self.logger.info(
-            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
+            # save last model...?
+        final_path = os.path.abspath(
+            "{}-FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
+        self.save_model(final_path)
