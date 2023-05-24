@@ -1626,11 +1626,12 @@ class MetatuneBERT(BaseTrainer):
                     - (loss_big / self.big_batch_size)
                 ) * (self.big_batch_size)
 
-                reg = 0
-                if l_diff >= 0:
-                    reg = loss_big * l_diff
+                # reg = 0
+                # if l_diff >= 0:
+                #     reg = loss_big * l_diff
 
-                loss = loss_big + reg
+                # loss = loss_big + reg
+                loss = loss_big
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
@@ -1668,6 +1669,10 @@ class MetatuneBERT(BaseTrainer):
                             )
                         )
             # save last model...?
+        # final_path = os.path.abspath(
+        #    "{}-FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        # )
+        # self.save_model(final_path)
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
