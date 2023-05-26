@@ -71,6 +71,26 @@ class BERTCFG:
     # def __repr__() -> str
 
 
+def tacoma_mlm_init(
+    model_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+    tokenizer_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+):
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
+    dataset_token = "[OQA]"
+    model = AutoModelForMaskedLM.from_pretrained(model_checkpoint)
+
+    # add new tokenizer
+    # special_tokens_dict = {"additional_special_tokens": dataset_token}
+    special_tokens_dict = {"mask_token": dataset_token}
+    num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+
+    # resize the model embeddings
+    model = model.resize_token_embeddings(len(tokenizer))
+
+    # @TODO :: modify datacollator to insert the masks
+    return model, tokenizer
+
+
 def bert_init(model_checkpoint, tokenizer_chekpoint):
     """Iinitialize BERT model for extractive question answering"""
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
@@ -541,7 +561,8 @@ def setup_pretrain_bert(train_path, config):
     from mage import generator
 
     # load the datasets, shuffle and split
-    pretraining_dataset = Dataset.load_from_disk(train_path)
+    pretraining_dataset = load_dataset("m-rousseau/tacoma22k")
+    pretraining_dataset = pretraining_dataset["train"]
 
     pretraining_dataset = pretraining_dataset.shuffle(
         seed=config.seed
@@ -549,11 +570,12 @@ def setup_pretrain_bert(train_path, config):
 
     logger.info("datasets loaded from disk, shuffled, training/validation split")
 
-    config.train_dataset = pretraining_dataset["train"]
+    config.train_dataset = pretraining_dataset["train"].select(range(10000))
     config.val_dataset = pretraining_dataset["test"]
 
-    config.model, config.tokenizer = bert_mlm_init(
-        config.model_checkpoint, config.tokenizer_checkpoint
+    config.model, config.tokenizer = tacoma_mlm_init(
+        model_checkpoint=config.model_checkpoint,
+        tokenizer_checkpoint=config.tokenizer_checkpoint,
     )
     logger.info("model and tokenizer initialized")
 

@@ -600,6 +600,9 @@ class PretrainBERT(BaseTrainer):
         save_path = os.path.abspath(
             "{}/final-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
+        tokenizer_path = os.path.abspath(
+            "{}/tokenizer-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
         best_val_loss = 100
 
         # experiment tracking
@@ -622,7 +625,7 @@ class PretrainBERT(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=100,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 
@@ -695,6 +698,7 @@ class PretrainBERT(BaseTrainer):
                 }
             )
             self.save_model(save_path)
+            self.tokenizer.save_pretrained(tokenizer_path)
             self.logger.info(
                 "Pretraining finished with best validation loss at {}!".format(
                     best_val_loss
