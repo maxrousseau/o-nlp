@@ -85,7 +85,7 @@ def tacoma_mlm_init(
     num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
 
     # resize the model embeddings
-    model = model.resize_token_embeddings(len(tokenizer))
+    model.resize_token_embeddings(len(tokenizer))
 
     # @TODO :: modify datacollator to insert the masks
     return model, tokenizer
