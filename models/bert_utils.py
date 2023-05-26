@@ -126,8 +126,8 @@ def preprocess_training(
     """
     questions = [q.strip() for q in examples["question"]]
     inputs = tokenizer(
-        questions,
-        examples["context"],
+        tokenizer.mask_token + questions,
+        tokenizer.mask_token + examples["context"],
         max_length=max_len,
         truncation="only_second",
         stride=stride,
@@ -206,8 +206,8 @@ def preprocess_validation(
     """
     questions = [q.strip() for q in examples["question"]]
     inputs = tokenizer(
-        questions,
-        examples["context"],
+        tokenizer.mask_token + questions,
+        tokenizer.mask_token + examples["context"],
         max_length=max_len,  # what is this for?
         truncation="only_second",
         stride=stride,
