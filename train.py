@@ -532,7 +532,7 @@ class PretrainBERT(BaseTrainer):
 
     def __init__(self, config):
         super().__init__(config)
-        self.mask_questions = False
+        self.mask_questions = True
 
     @torch.no_grad()
     def __eval(self, losses):

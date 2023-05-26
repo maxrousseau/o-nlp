@@ -174,8 +174,8 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
     """Here I need the the sentence start position in the context"""
 
     inputs = tokenizer(
-        example["question"],
-        example["text"],
+        tokenizer.mask_token + example["question"],
+        tokenizer.mask_token + example["text"],
         max_length=max_sequence_length,
         truncation=True,
         padding="max_length",
@@ -188,11 +188,13 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
     inputs["valid"] = True
     inputs["mask_mappings"] = []
 
-    start_pos_sentence = example["target_start"]
-    end_pos_sentence = start_pos_sentence + len(example["target"])
+    # add 5 bc len of "[OQA]" special token
 
-    start_pos_question = 0
-    end_pos_question = len(example["question"])
+    start_pos_sentence = example["target_start"] + 5
+    end_pos_sentence = start_pos_sentence + len(example["target"]) + 5
+
+    start_pos_question = 5
+    end_pos_question = len(example["question"]) + 5
 
     start_question_mapping = find_offset(
         inputs["offset_mapping"], 0, start_pos_question
