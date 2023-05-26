@@ -191,7 +191,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
     # add 5 bc len of "[OQA]" special token
 
     start_pos_sentence = example["target_start"] + 5
-    end_pos_sentence = start_pos_sentence + len(example["target"]) + 5
+    end_pos_sentence = start_pos_sentence + len(example["target"])
 
     start_pos_question = 5
     end_pos_question = len(example["question"]) + 5
@@ -201,7 +201,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
     )
     end_question_mapping = find_offset(inputs["offset_mapping"], 1, end_pos_question)
 
-    question_offset = end_question_mapping + 1  # sep token
+    question_offset = end_question_mapping + 2  # sep token
 
     # @BUG :: because the .find method was used I have a bad start position for a particular sentence!! this causes
     # issues with start of sentence/end of sentence find offset returning None, hacky fix now to just return empty
@@ -210,7 +210,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
         inputs["offset_mapping"][question_offset:], 0, start_pos_sentence
     )
     if start_sentence_offset == None:
-        inputs["mask_mappings"].append([])
+        inputs["mask_mappings"].append(None)
         inputs["valid"] = False
         return inputs
 
@@ -227,7 +227,7 @@ def mask_mapping(example, tokenizer, max_sequence_length=512):
             inputs["offset_mapping"][question_offset:], 1, end_pos_sentence
         )
         if end_sentence_offset == None:
-            inputs["mask_mappings"].append([])
+            inputs["mask_mappings"].append(None)
             inputs["valid"] = False
             return inputs
         end_sentence_mapping = end_sentence_offset + question_offset
@@ -454,6 +454,10 @@ def test_case():
 # tk = tokenize_tacoma(tacoma_tgt, tokenizer)
 # tacoma_collator = TacomaCollator(tokenizer)
 # tacoma_test = tacoma_collator(tk) (this will be for the training function! / dataloader)
+
+
+# @BUG missing most of the samples bc target start is fucked up
+# def check
 
 
 if __name__ == "__main__":
