@@ -1232,8 +1232,9 @@ class EvaluateBERT(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
-        if return_answers:
-            return predicted_answers
+        # if return_answers:
+        #    return predicted_answers
+
         return f1_score, em
 
 
