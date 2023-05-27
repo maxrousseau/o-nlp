@@ -50,6 +50,9 @@ class BERTCFG:
     seed: int = 0
     append_special_token: bool = False
 
+    train_batch_size: int = 4
+    val_batch_size: int = 16
+
     load_from_checkpoint: bool = False
     checkpoint_state: str = None
     checkpoint_step: int = None
