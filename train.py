@@ -1234,6 +1234,7 @@ class EvaluateBERT(BaseTester):
         )
         if return_answers:
             return predicted_answers
+        return f1_score, em
 
 
 class EvaluateBART(BaseTester):
