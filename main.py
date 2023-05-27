@@ -179,6 +179,7 @@ def main(argv):
             max_length=FLAGS.max_seq_len,
             seed=FLAGS.seed,
             runmode=FLAGS.runmode,
+            append_special_token=False,
         )
         config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
 

@@ -48,6 +48,7 @@ class BERTCFG:
     stride: int = 128
     padding: str = "max_length"
     seed: int = 0
+    append_special_token: bool = False
 
     load_from_checkpoint: bool = False
     checkpoint_state: str = None
@@ -116,7 +117,12 @@ def splinter_init(model_checkpoint, tokenizer_chekpoint):
 
 
 def preprocess_training(
-    examples, tokenizer, padding="max_length", stride=128, max_len=128
+    examples,
+    tokenizer,
+    padding="max_length",
+    stride=128,
+    max_len=128,
+    append_special_token=False,
 ):
     """
     preprocessing for training examples
@@ -124,10 +130,16 @@ def preprocess_training(
             inputs:
             features: ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id', 'start_position', 'end_position']
     """
-    questions = [q.strip() for q in examples["question"]]
+    if append_special_token:
+        questions = tokenizer.mask_token + [q.strip() for q in examples["question"]]
+        contexts = tokenizer.mask_token + examples["context"]
+    else:
+        questions = [q.strip() for q in examples["question"]]
+        contexts = examples["context"]
+
     inputs = tokenizer(
-        tokenizer.mask_token + questions,
-        tokenizer.mask_token + examples["context"],
+        questions,
+        contexts,
         max_length=max_len,
         truncation="only_second",
         stride=stride,
@@ -197,17 +209,28 @@ def preprocess_training(
 
 
 def preprocess_validation(
-    examples, tokenizer, padding="max_length", stride=128, max_len=128
+    examples,
+    tokenizer,
+    padding="max_length",
+    stride=128,
+    max_len=128,
+    append_special_token=False,
 ):
     """preprocessing for evalutation samples (validation and test)
     return:
     inputs:
     features ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id']
     """
-    questions = [q.strip() for q in examples["question"]]
+    if append_special_token:
+        questions = tokenizer.mask_token + [q.strip() for q in examples["question"]]
+        contexts = tokenizer.mask_token + examples["context"]
+    else:
+        questions = [q.strip() for q in examples["question"]]
+        contexts = examples["context"]
+
     inputs = tokenizer(
-        tokenizer.mask_token + questions,
-        tokenizer.mask_token + examples["context"],
+        questions,
+        contexts,
         max_length=max_len,  # what is this for?
         truncation="only_second",
         stride=stride,
@@ -308,12 +331,18 @@ def prepare_inputs(
     max_len,
     subset=None,
     padding="max_length",
+    append_special_token=False,
 ):
     """ """
     if subset == "train":
         tokenized_dataset = dataset.map(
             lambda example: preprocess_training(
-                example, tokenizer, padding=padding, max_len=max_len, stride=stride
+                example,
+                tokenizer,
+                padding=padding,
+                max_len=max_len,
+                stride=stride,
+                append_special_token=append_special_token,
             ),
             batched=True,
             remove_columns=dataset.column_names,
@@ -328,7 +357,12 @@ def prepare_inputs(
     elif subset == "eval":
         tokenized_dataset = dataset.map(
             lambda example: preprocess_validation(
-                example, tokenizer, padding=padding, max_len=max_len, stride=stride
+                example,
+                tokenizer,
+                padding=padding,
+                max_len=max_len,
+                stride=stride,
+                append_special_token=append_special_token,
             ),
             batched=True,
             remove_columns=dataset.column_names,
@@ -434,6 +468,7 @@ def setup_finetuning_splinter_oqa(train_path, val_path, config, train_tacoma=Fal
         max_len=config.max_length,
         padding=config.padding,
         subset="train",
+        append_special_token=config.append_special_token,
     )
     config.val_batches = prepare_inputs(
         config.val_dataset,
@@ -442,6 +477,7 @@ def setup_finetuning_splinter_oqa(train_path, val_path, config, train_tacoma=Fal
         max_len=config.max_length,
         padding=config.padding,
         subset="eval",
+        append_special_token=config.append_special_token,
     )
 
     return config
