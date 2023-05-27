@@ -7,7 +7,7 @@ pip install evaluate
 pip install datasets
 pip install sentencepiece
 pip install wandb
-pip install -U setfit
+pip install setfit
 
 wandb login 7a817528b63f37a967ac341e84ae3ba00dd9f18e
 

@@ -320,7 +320,7 @@ class TacomaCollator(DataCollatorForWholeWordMask):
             )
 
         if self.mask_questions:
-            mapping_id = random.randint(1, 2)
+            mapping_id = np.random.choice([1, 2], p=[0.8, 0.2])
         else:
             mapping_id = 1  # always mask within target sentence
 
