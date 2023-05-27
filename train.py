@@ -752,7 +752,7 @@ class FinetuneBERT(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=default_data_collator,
-            batch_size=4,
+            batch_size=16,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
