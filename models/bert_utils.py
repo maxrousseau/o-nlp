@@ -44,7 +44,7 @@ class BERTCFG:
     model_checkpoint: str = ""
     tokenizer_checkpoint: str = ""
     checkpoint_savedir: str = "./bert-ckpt"
-    max_length: int = 384
+    max_length: int = 512
     stride: int = 128
     padding: str = "max_length"
     seed: int = 0
@@ -57,22 +57,42 @@ class BERTCFG:
     checkpoint_state: str = None
     checkpoint_step: int = None
 
-    big_dataset: Dataset = None
     train_dataset: Dataset = None
     val_dataset: Dataset = None
     test_dataset: Dataset = None
 
-    big_batches: Any = None
     val_batches: Any = None
     train_batches: Any = None
     test_batches: Any = None
 
     model: Any = None
     tokenizer: Any = None
-    runmode: str = None
 
-    # TBD add a print/export function to the config when we save model...
-    # def __repr__() -> str
+    def __repr__(self) -> str:
+        s = """
+BERT-like model configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Hyperparameters :
+                lr={},
+                lr_scheduler={},
+                num_epochs={},
+                batch_size={}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_length,
+            self.lr,
+            self.lr_scheduler,
+            self.n_epochs,
+            self.train_batch_size,
+        )
+        return s
 
 
 def tacoma_mlm_init(

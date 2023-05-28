@@ -67,7 +67,6 @@ class BARTCFG:
 
     model: Any = None
     tokenizer: Any = None
-    runmode: str = None
 
     # TBD add a print/export function to the config when we save model...
     # def __repr__() -> str
