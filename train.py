@@ -245,7 +245,7 @@ class FinetuneT5(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=0,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 
@@ -426,7 +426,7 @@ class PretrainT5(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=100,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 
@@ -1102,7 +1102,7 @@ class FinetuneBART(BaseTrainer):
             lr_scheduler = get_scheduler(
                 "linear",
                 optimizer=optimizer,
-                num_warmup_steps=100,
+                num_warmup_steps=0.1 * num_training_steps,
                 num_training_steps=num_training_steps,
             )
 

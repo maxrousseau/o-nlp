@@ -1,0 +1,27 @@
+[mode]
+runmode = "bert-finetune"
+
+[model]
+name = "bert-base-sft-default"
+max_seq_len = 512
+checkpoint = "bert-base-uncased"
+
+[dataset]
+train_dataset_path="./tmp/bin/train"
+val_dataset_path="./tmp/bin/val"
+test_dataset_path="./tmp/bin/test"
+
+
+[tokenizer]
+checkpoint = "bert-base-uncased"
+
+[hyperparameters]
+learning_rate = 1e-5
+learning_rate_scheduler = true
+num_epochs = 10
+training_batch_size = 16
+validation_batch_size = 16
+seed = 0
+
+[misc]
+save_dir = "./"

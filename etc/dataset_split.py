@@ -36,6 +36,7 @@ def load_from_json(fpath):
     )
 
 
+# @TODO :: just go for (80, 20,) 20
 def split_by_topic(dataset, val_split=0.12, test_split=0.18):
     """ """
 

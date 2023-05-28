@@ -1,224 +1,195 @@
 #!/usr/bin/env python
 import os
 import logging
+import argparse
+import tomli
 
 from models import t5_utils, bert_utils, bart_utils, setfit_utils
-
 from train import *
 
 
-from absl import app
-from absl import flags
-
 from datasets import Dataset
 
-FLAGS = flags.FLAGS
 
-runmode = [
-    "t5-finetune",
-    "t5-evaluate",
-    "t5-pretrain",
-    "bart-finetune",
-    "bart-pretrain",
-    "bart-evaluate",
-    "bert-finetune",
-    "bert-squad-finetune",
-    "bert-evaluate",
-    "bert-pretrain",
-    "splinter-finetune",
-    "train-classifier",
-    "bert-metatune",
-]
-
-flags.DEFINE_string(
-    "name", None, "model name for saving checkpoints and tracking loss w/ wandb"
-)
-flags.DEFINE_enum("runmode", None, runmode, "type of training to run model-type")
-flags.DEFINE_float("lr", 2e-5, "learning rate (AdamW optimizer)")
-flags.DEFINE_integer("epochs", 2, "number of training epochs")
-flags.DEFINE_bool("lr_scheduler", True, "use learning rate scheduler")
-
-flags.DEFINE_integer("checkpoint_step", None, "current step at last checkpoint save")
-flags.DEFINE_string(
-    "checkpoint_state", None, "path to the checkpoint directory to load from"
-)
-flags.DEFINE_bool("load_from_checkpoint", False, "load from a checkpoint?")
-
-flags.DEFINE_bool(
-    "only_cls_head", False, "freeze all parameters except the classification head"
-)
-
-
-flags.DEFINE_integer("max_seq_len", 384, "maximum length (tokens) of input sequence")
-flags.DEFINE_integer("max_ans_len", 128, "maximum length (tokens) of output sequence")
-
-
-flags.DEFINE_integer("seed", 0, "random seed")
-
-
-flags.DEFINE_string("train_dataset", None, "training dataset")
-flags.DEFINE_string("val_dataset", None, "validation dataset")
-flags.DEFINE_string("test_dataset", None, "test/evaluation dataset")
-
-
-flags.DEFINE_string(
-    "model_checkpoint", None, "model checkpoint for loading pretrained weights"
-)
-flags.DEFINE_string(
-    "tokenizer_checkpoint", None, "model checkpoint for loading pretrained weights"
-)
-flags.DEFINE_string("savedir", None, "directory for model and checkpoint export")
-
-flags.DEFINE_bool("lora", False, "finetune model with LoRA")
-# @TODO :: absl-py seems quite slow, try radicli...
-
-
-def main(argv):
+def main():
     """get args and call"""
+    parser = argparse.ArgumentParser(
+        description="Read TOML configuration file for training and inference"
+    )
+    parser.add_argument(
+        "config",
+        metavar="path",
+        type=str,
+        nargs=1,
+        help="path to the configuration file",
+    )
+    # @TODO :: absl-py seems quite slow, try radicli...
+    args = parser.parse_args()
 
-    train_ds_path = FLAGS.train_dataset
-    val_ds_path = FLAGS.val_dataset
-    test_ds_path = FLAGS.test_dataset
+    config_path = args.config[0]
+    with open(config_path, "rb") as f:
+        config = tomli.load(f)
 
-    runmode = FLAGS.runmode
+    runmode = config["mode"]["runmode"]
+    model_config = config["model"]
+    dataset_config = config["dataset"]
+    tokenizer_config = config["tokenizer"]
+    hyperparameter_config = config["hyperparameters"]
+    misc_config = config["misc"]
 
     if runmode == "t5-finetune":
-        config = t5_utils.T5CFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        t5_config = t5_utils.T5CFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = t5_utils.setup_finetune_t5(train_ds_path, val_ds_path, config)
-        tuner = FinetuneT5(config)
+        t5_config = t5_utils.setup_finetune_t5(
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            t5_config,
+        )
+        tuner = FinetuneT5(t5_config)
         tuner()
 
     elif runmode == "t5-evaluate":
-        config = t5_utils.T5CFG(
-            name=FLAGS.name,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        t5_config = t5_utils.T5CFG(
+            name=model_config["name"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = t5_utils.setup_evaluate_t5(test_ds_path, config)
+        t5_config = t5_utils.setup_evaluate_t5(
+            dataset_config["test_dataset_path"], t5_config
+        )
         # @HERE :: make sure setup function is good, then finish training loop
-        evaluator = EvaluateT5(config)
+        evaluator = EvaluateT5(t5_config)
         evaluator()
 
     elif runmode == "bart-finetune":
-        config = bart_utils.BARTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        bart_config = bart_utils.BARTCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = bart_utils.setup_finetune_bart(train_ds_path, val_ds_path, config)
+        bart_config = bart_utils.setup_finetune_bart(
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            bart_config,
+        )
         # @HERE :: make sure setup function is good, then finish training loop
-        tuner = FinetuneBART(config)
+        tuner = FinetuneBART(bart_config)
         tuner()
 
     elif runmode == "bart-evaluate":
-        config = bart_utils.BARTCFG(
-            name=FLAGS.name,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        bart_config = bart_utils.BARTCFG(
+            name=model_config["name"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = bart_utils.setup_evaluate_bart(test_ds_path, config)
+        bart_config = bart_utils.setup_evaluate_bart(
+            dataset_config["test_dataset_path"], bart_config
+        )
         # @HERE :: make sure setup function is good, then finish training loop
-        evaluater = EvaluateBART(config)
+        evaluater = EvaluateBART(bart_config)
         evaluater()
 
     elif runmode == "bert-pretrain":
-        config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        bert_config = bert_utils.BERTCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = bert_utils.setup_pretrain_bert(train_ds_path, config)
+        bert_config = bert_utils.setup_pretrain_bert(
+            dataset_config["train_dataset_path"], bert_config
+        )
 
-        tuner = PretrainBERT(config)
+        tuner = PretrainBERT(bert_config)
         tuner()
 
     elif runmode == "bert-finetune":
-        config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
-            append_special_token=False,
+        bert_config = bert_utils.BERTCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
+            append_special_token=tokenizer_config["append_special_tokens"],
         )
-        config = bert_utils.setup_finetuning_oqa(train_ds_path, val_ds_path, config)
+        bert_config = bert_utils.setup_finetuning_oqa(
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            bert_config,
+        )
 
-        tuner = FinetuneBERT(config)
+        tuner = FinetuneBERT(bert_config)
         tuner()
+
     elif runmode == "splinter-finetune":
         config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
         config = bert_utils.setup_finetuning_splinter_oqa(
-            train_ds_path, val_ds_path, config
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            config,
         )
         tuner = FinetuneSplinter(config)
         tuner()
 
     elif runmode == "bert-metatune":
         config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
         config = bert_utils.setup_metatune(
-            train_ds_path, val_ds_path, config, only_head=FLAGS.only_cls_head
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            config,
+            only_head=FLAGS.only_cls_head,
         )
         tuner = MetatuneBERT(
             config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=4
@@ -226,82 +197,82 @@ def main(argv):
         tuner()
 
     elif runmode == "bert-squad-finetune":
-        config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        bert_config = bert_utils.BERTCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = bert_utils.setup_finetuning_squad(
-            val_ds_path, config, only_head=FLAGS.only_cls_head
+        bert_config = bert_utils.setup_finetuning_squad(
+            dataset_config["val_dataset_path"],
+            bert_config,
         )
-        tuner = FinetuneBERT(config)
+        tuner = FinetuneBERT(bert_config)
         tuner()
 
     elif runmode == "bert-evaluate":
-        config = bert_utils.BERTCFG(
-            name=FLAGS.name,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        bert_config = bert_utils.BERTCFG(
+            name=model_config["name"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = bert_utils.setup_evaluate_oqa(test_ds_path, config)
+        bert_config = bert_utils.setup_evaluate_oqa(
+            dataset_config["test_dataset_path"], bert_config
+        )
 
-        evaluater = EvaluateBERT(config)
+        evaluater = EvaluateBERT(bert_config)
         evaluater()
 
     elif runmode == "t5-pretrain":
-        config = t5_utils.T5CFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            lr_scheduler=FLAGS.lr_scheduler,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            tokenizer_checkpoint=FLAGS.tokenizer_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_seq_length=FLAGS.max_seq_len,
-            max_ans_length=FLAGS.max_ans_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
-            checkpoint_step=FLAGS.checkpoint_step,
-            checkpoint_state=FLAGS.checkpoint_state,
-            load_from_checkpoint=FLAGS.load_from_checkpoint,
+        t5_config = t5_utils.T5CFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
+            checkpoint_step=model_config["checkpoint_step"],
+            checkpoint_state=model_config["checkpoint_state"],
+            load_from_checkpoint=model_config["load_from_last_checkpoint"],
         )
-        config = t5_utils.setup_pretrain_t5(train_ds_path, config)
-        pretrainer = PretrainT5(config)
+        t5_config = t5_utils.setup_pretrain_t5(
+            dataset_config["train_dataset_path"], t5_config
+        )
+        pretrainer = PretrainT5(t5_config)
         pretrainer()
 
     elif runmode == "train-classifier":
-        config = setfit_utils.SFCFG(
-            name=FLAGS.name,
-            lr=FLAGS.lr,
-            n_epochs=FLAGS.epochs,
-            model_checkpoint=FLAGS.model_checkpoint,
-            checkpoint_savedir=FLAGS.savedir,
-            max_length=FLAGS.max_seq_len,
-            seed=FLAGS.seed,
-            runmode=FLAGS.runmode,
+        setfit_config = setfit_utils.SFCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
         )
-        config = setfit_utils.setup_setfit_training(train_ds_path, val_ds_path, config)
-        trainer = Setfit(config)
+        setfit_config = setfit_utils.setup_setfit_training(
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            setfit_config,
+        )
+        trainer = Setfit(setfit_config)
         trainer()
 
     else:
-        None
-
-    # @TODO cleanup the load function to only output train, val and test datasets
-    # @TODO add logging here
-
-    # test the data preprocessing
+        assert TypeError
 
 
 if __name__ == "__main__":
-    app.run(main)
+    main()
