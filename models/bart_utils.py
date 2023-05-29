@@ -68,8 +68,33 @@ class BARTCFG:
     model: Any = None
     tokenizer: Any = None
 
-    # TBD add a print/export function to the config when we save model...
-    # def __repr__() -> str
+    def __repr__(self) -> str:
+        s = """
+BART model configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Max answer length : {}
+        Hyperparameters :
+                lr={},
+                lr_scheduler={},
+                num_epochs={},
+                batch_size={}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_seq_length,
+            self.max_ans_length,
+            self.lr,
+            self.lr_scheduler,
+            self.n_epochs,
+            self.train_batch_size,
+        )
+        return s
 
 
 def bart_init(model_checkpoint, tokenizer_checkpoint):

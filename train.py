@@ -2,7 +2,6 @@ import os
 import logging
 import shutil
 from datetime import datetime
-import itertools
 
 import numpy as np
 import random
@@ -15,10 +14,8 @@ from mage.generator import TacomaCollator
 
 from transformers import (
     get_scheduler,
-    get_constant_schedule_with_warmup,
     DataCollatorForSeq2Seq,
     default_data_collator,
-    AutoModelForQuestionAnswering,
 )
 
 from accelerate import Accelerator
@@ -298,17 +295,17 @@ class FinetuneT5(BaseTrainer):
                 {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
             )
 
-            # @HERE :: TODO -- hook up wandb and then refactor BART in this way...
-
             # save the best model
             if f1_score > best_f1:
                 best_f1 = f1_score
                 self.save_model(save_path)
                 self.logger.info("new best model saved!")
 
-        # @TODO :: next re
-
         self.logger.info("Best model f1 = {}".format(best_f1))
+
+
+class TaskDistillationBERT(BaseTrainer):
+    """@TODO ::  implement knowledge distillation from QA experts (teacher) to domain experts (student)"""
 
 
 class PretrainT5(BaseTrainer):
@@ -403,9 +400,12 @@ class PretrainT5(BaseTrainer):
     def __call__(self):
         """ """
         self.__get_dataloaders()
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         local_path = os.path.abspath(
-            "{}-{}-fullrun".format(self.checkpoint_savedir, self.name)
+            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
+
+        best_val_loss = 100
 
         wandb.init(
             project="o-nlp_experiments",
@@ -471,8 +471,6 @@ class PretrainT5(BaseTrainer):
                 )
             )
 
-        # @TODO :: eval here before we start training then only eval every 100k masked tokens otherwise it is probably
-        # going to take too long to train (right now over 8hours for 86k samples)
         self.model.train()
         for epoch in range(self.num_epochs):
             for steps, batch in enumerate(self.train_dataloader):
@@ -493,7 +491,6 @@ class PretrainT5(BaseTrainer):
                 else:
                     loss.backward()
 
-                # @TODO :: accumulate training losses in numpy array losses["train"]
                 optimizer.step()
                 if self.lr_scheduler:
                     lr_scheduler.step()
@@ -512,8 +509,15 @@ class PretrainT5(BaseTrainer):
                         )
                     )
                     losses = self.__eval(losses)
-
                     # @TODO :: save best model according to lowest validation loss!
+                    if np.array(losses["val"]).mean() < best_val_loss:
+                        best_val_path = os.path.abspath(
+                            "{}/bestval-{}-{}".format(
+                                self.checkpoint_savedir, self.name, timestamp
+                            )
+                        )
+                        self.save_model(best_val_path)
+                        best_val_loss = np.array(losses["val"]).mean()
 
                     # get mean training and val losses, reset the losses arrays, log n_masked_tokens, step and more
                     wandb.log(
@@ -536,6 +540,7 @@ class PretrainBERT(BaseTrainer):
     def __init__(self, config):
         super().__init__(config)
         self.mask_questions = True
+        self.eval_interval = 100
 
     @torch.no_grad()
     def __eval(self, losses):
@@ -664,8 +669,7 @@ class PretrainBERT(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
 
-                # eval every 100 steps
-                if (steps % 100) == 0:
+                if (steps % self.eval_interval) == 0:
                     losses = self.__eval(losses)
                     if np.array(losses["val"]).mean() < best_val_loss:
                         best_val_path = os.path.abspath(
@@ -859,153 +863,6 @@ class FinetuneBERT(BaseTrainer):
         )
 
 
-class FinetuneSplinter(BaseTrainer):
-    """ """
-
-    def __init__(self, config):
-        super().__init__(config)
-
-    @torch.no_grad()
-    def __eval(self, accelerator):
-        """ """
-        start_logits = []
-        end_logits = []
-
-        self.model.eval()
-
-        for batch in tqdm(self.val_dataloader):
-            outputs = self.model(**batch)
-            start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
-            end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
-
-        start_logits = np.concatenate(start_logits)
-        end_logits = np.concatenate(end_logits)
-        start_logits = start_logits[: len(self.val_batches)]
-        end_logits = end_logits[: len(self.val_batches)]
-        metrics, unused, unused = bert_utils.answer_from_logits(
-            start_logits,
-            end_logits,
-            self.val_batches,
-            self.val_dataset,
-            self.tokenizer,
-        )
-        f1_score = metrics["f1"]
-        accelerator.wait_for_everyone()
-        return f1_score
-
-    def __get_dataloaders(self):
-        """"""
-        train_tensor = self.train_batches
-        train_tensor.set_format("torch")
-        self.train_dataloader = DataLoader(
-            train_tensor,
-            shuffle=True,
-            collate_fn=default_data_collator,
-            batch_size=12,
-            num_workers=0,
-            worker_init_fn=self.seed_worker,
-            generator=self.g,
-        )
-
-        val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
-        val_tensor.set_format("torch")
-        self.val_dataloader = DataLoader(
-            val_tensor,
-            collate_fn=default_data_collator,
-            batch_size=12,
-            shuffle=False,
-        )
-
-        self.logger.info("Training and validation dataloaders created")
-
-    def __call__(self):
-
-        # dataloaders
-        self.__get_dataloaders()
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
-
-        # experiment tracking
-        wandb.init(
-            project="o-nlp_experiments",
-            config={
-                "learning_rate": self.lr,
-                "architecture": self.name,
-                "dataset": "oqa",
-                "epochs": self.num_epochs,
-            },
-        )
-
-        best_f1 = -1
-        optimizer = AdamW(self.model.parameters(), lr=self.lr)
-        num_update_steps_per_epoch = len(self.train_dataloader)
-        num_training_steps = self.num_epochs * num_update_steps_per_epoch
-
-        # accelerator
-        if self.lr_scheduler:
-            lr_scheduler = get_scheduler(
-                "linear",
-                optimizer=optimizer,
-                num_warmup_steps=0.1 * num_training_steps,
-                num_training_steps=num_training_steps,
-            )
-
-        if torch.device != "cpu":
-            # @BUG mixed precision breaks generation
-            accelerator = Accelerator(mixed_precision="fp16")
-            (
-                self.model,
-                optimizer,
-                self.train_dataloader,
-                self.val_dataloader,
-            ) = accelerator.prepare(
-                self.model, optimizer, self.train_dataloader, self.val_dataloader
-            )
-            if self.lr_scheduler:
-                accelerator.register_for_checkpointing(lr_scheduler)
-
-        losses = {"train": []}
-
-        # training loop
-        progressbar = tqdm(range(num_training_steps))
-        for epoch in range(self.num_epochs):
-            self.model.train()
-            for steps, batch in enumerate(self.train_dataloader):
-                outputs = self.model(**batch)
-                loss = outputs.loss
-                accelerator.backward(loss)
-                losses["train"].append(loss.detach().cpu().numpy())
-
-                optimizer.step()
-                if self.lr_scheduler:
-                    lr_scheduler.step()
-                optimizer.zero_grad()
-                progressbar.update(1)
-
-                # if steps % 100 == 0:
-            # eval
-            f1_score = self.__eval(accelerator)
-            self.logger.info("epoch {} : f1 {}".format(epoch, f1_score))
-            wandb.log(
-                {
-                    "val_f1": f1_score,
-                    "train_loss": np.array(losses["train"]).mean(),
-                }
-            )
-
-            # checkpointing (only best_val)
-            if f1_score > best_f1:
-                self.save_model(save_path)
-                best_f1 = f1_score
-                self.logger.info("New save with f1 = {}".format(best_f1))
-
-        self.logger.info(
-            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
-        )
-
-
 class FinetuneBART(BaseTrainer):
     """>>> tuner = FinetuneBART(config)
     desired output"""
@@ -1154,10 +1011,6 @@ class FinetuneBART(BaseTrainer):
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )
         # @HERE :: debug then setup wandb logging
-
-
-class PretrainBART(BaseTrainer):
-    """ """
 
 
 class EvaluateBERT(BaseTester):
@@ -1443,261 +1296,3 @@ class Setfit(SetFitTrainer):
         self.logger.info(
             "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
         )
-
-
-# @HERE :: copy this class and adapt for Splinter (see HF)
-class MetatuneBERT(BaseTrainer):
-    """ """
-
-    def __init__(
-        self, config, n_step_eval=100, stagnation_threshold=1, n_steps_nudge=4
-    ):
-        super().__init__(config)
-        self.big_dataset = config.big_dataset
-        self.big_batches = config.big_batches
-        self.n_step_eval = n_step_eval
-        self.stagnation_threshold = stagnation_threshold
-        self.n_step_nudge = n_steps_nudge
-
-        self.big_batch_size = 16
-        self.small_batch_size = 16
-        self.val_batch_size = 16
-
-        self.threshold = 1
-
-    @torch.no_grad()
-    def __eval(self, accelerator):
-        """ """
-        start_logits = []
-        end_logits = []
-
-        self.model.eval()
-
-        val_loss = []
-
-        for batch in tqdm(self.val_dataloader):
-            outputs = self.model(**batch)
-
-            start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
-            end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
-
-            val_loss.append(outputs.loss.detach().cpu().numpy())
-        start_logits = np.concatenate(start_logits)
-        end_logits = np.concatenate(end_logits)
-        start_logits = start_logits[: len(self.val_batches)]
-        end_logits = end_logits[: len(self.val_batches)]
-
-        metrics, unused, unused = bert_utils.answer_from_logits(
-            start_logits,
-            end_logits,
-            self.val_batches,
-            self.val_dataset,
-            self.tokenizer,
-        )
-        f1_score = metrics["f1"]
-        val_loss = np.array(val_loss).mean()
-        accelerator.wait_for_everyone()
-        self.model.train()
-        return f1_score, val_loss
-
-    def __get_dataloaders(self):
-        """"""
-        train_tensor = self.train_batches.remove_columns(
-            ["example_id", "offset_mapping"]
-        )
-        train_tensor.set_format("torch")
-        self.train_dataloader = DataLoader(
-            train_tensor,
-            shuffle=True,
-            collate_fn=default_data_collator,
-            batch_size=self.small_batch_size,
-            num_workers=0,
-            worker_init_fn=self.seed_worker,
-            generator=self.g,
-        )
-
-        big_tensor = self.big_batches.remove_columns(["example_id", "offset_mapping"])
-        big_tensor.set_format("torch")
-        self.big_dataloader = DataLoader(
-            big_tensor,
-            shuffle=True,
-            collate_fn=default_data_collator,
-            batch_size=self.big_batch_size,
-            num_workers=0,
-            worker_init_fn=self.seed_worker,
-            generator=self.g,
-        )
-
-        val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
-        #    val_tensor = self.val_batches
-        val_tensor.set_format("torch")
-        self.val_dataloader = DataLoader(
-            val_tensor,
-            collate_fn=default_data_collator,
-            batch_size=self.val_batch_size,
-            shuffle=False,
-        )
-
-        self.logger.info("Training and validation dataloaders created")
-
-    def __call__(self):
-
-        # dataloaders
-        self.__get_dataloaders()
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        f1_save_path = os.path.abspath(
-            "{}-f1-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
-        loss_save_path = os.path.abspath(
-            "{}-val_loss-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
-
-        # experiment tracking
-        wandb.init(
-            project="o-nlp_experiments",
-            config={
-                "learning_rate": self.lr,
-                "architecture": self.name,
-                "dataset": "squad-oqa",
-                "epochs": self.num_epochs,
-            },
-        )
-
-        best_f1 = -1
-        lowest_val = 100
-        optimizer = AdamW(self.model.parameters(), lr=self.lr)
-
-        num_steps_per_epoch_small = len(self.big_dataloader)
-
-        # self.n_step_eval = num_steps_per_epoch_small
-        self.n_step_eval = 50
-
-        num_training_steps = self.num_epochs * num_steps_per_epoch_small
-
-        # accelerator
-        # if self.lr_scheduler:
-        #     lr_scheduler = get_constant_schedule_with_warmup(
-        #         optimizer=optimizer,
-        #         num_warmup_steps=0.1 * num_training_steps,
-        #     )
-        # lr_scheduler = get_scheduler(
-        #     "linear",
-        #
-        # )
-
-        if self.lr_scheduler:
-            lr_scheduler = get_scheduler(
-                "linear",
-                optimizer=optimizer,
-                num_warmup_steps=0.1 * num_training_steps,
-                num_training_steps=num_training_steps,
-            )
-
-        if torch.device != "cpu":
-            # @BUG mixed precision breaks generation
-            accelerator = Accelerator(mixed_precision="fp16")
-            # accelerator.distributed_type("MULTI_GPU")
-            (
-                self.model,
-                optimizer,
-                self.big_dataloader,
-                self.train_dataloader,
-                self.val_dataloader,
-            ) = accelerator.prepare(
-                self.model,
-                optimizer,
-                self.big_dataloader,
-                self.train_dataloader,
-                self.val_dataloader,
-            )
-            if self.lr_scheduler:
-                accelerator.register_for_checkpointing(lr_scheduler)
-
-        losses = {"train": []}
-
-        # big_iterator = itertools.cycle(self.big_dataloader)
-        small_iterator = itertools.cycle(self.train_dataloader)
-
-        # training loop
-        progressbar = tqdm(range(num_training_steps))
-
-        # outer loop
-        for epoch in range(self.num_epochs):
-
-            for steps, batch in enumerate(self.big_dataloader):
-
-                self.model.eval()
-                with torch.no_grad():
-                    reg_batch = next(small_iterator)
-                    outputs = self.model(**reg_batch)
-                    loss_small = outputs.loss
-                    del reg_batch
-                    torch.cuda.empty_cache()
-
-                self.model.train()
-
-                outputs = self.model(**batch)
-                loss_big = outputs.loss
-
-                self.model.train()
-
-                l_diff = (
-                    (loss_small / self.small_batch_size)
-                    - (loss_big / self.big_batch_size)
-                ) * (self.big_batch_size)
-
-                reg = 0
-                if l_diff >= 1:
-                    reg = torch.log(l_diff)
-
-                loss = loss_big + reg
-                # loss = loss_big
-
-                accelerator.backward(loss)
-                losses["train"].append(loss.detach().cpu().numpy())
-
-                optimizer.step()
-                if self.lr_scheduler:
-                    lr_scheduler.step()
-                optimizer.zero_grad()
-
-                progressbar.update(1)
-
-                if steps % self.n_step_eval == 0:
-
-                    # eval
-                    f1_score, val_loss = self.__eval(accelerator)
-                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-                    wandb.log(
-                        {
-                            "val_f1": f1_score,
-                            "val_loss": val_loss,
-                            "train_loss": np.array(losses["train"]).mean(),
-                            "n_step": steps,
-                            "n_epoch": epoch,
-                        }
-                    )
-
-                    # checkpointing (only best_val)
-                    if f1_score > best_f1:
-                        # accelerator.save_state(save_path)
-                        self.save_model(f1_save_path)
-                        best_f1 = f1_score
-                        self.logger.info(
-                            "New save with f1 = {} @ {}".format(best_f1, f1_save_path)
-                        )
-                    if val_loss < lowest_val:
-                        lowest_val = val_loss
-                        self.save_model(loss_save_path)
-                        best_f1 = f1_score
-                        self.logger.info(
-                            "New save val_loss = {} @ {}".format(
-                                val_loss, loss_save_path
-                            )
-                        )
-
-            # save last model...?
-        final_path = os.path.abspath(
-            "{}-FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
-        self.save_model(final_path)

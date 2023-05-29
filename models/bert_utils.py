@@ -16,7 +16,6 @@ from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
     AutoModelForMaskedLM,
-    SplinterForQuestionAnswering,
 )
 
 import datasets
@@ -127,14 +126,6 @@ def bert_mlm_init(model_checkpoint, tokenizer_chekpoint):
     """Iinitialize BERT model for masked language modelling"""
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
     model = AutoModelForMaskedLM.from_pretrained(model_checkpoint)
-
-    return model, tokenizer
-
-
-def splinter_init(model_checkpoint, tokenizer_chekpoint):
-    """Iinitialize splinter model for extractive question answering"""
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_chekpoint)
-    model = SplinterForQuestionAnswering.from_pretrained(model_checkpoint)
 
     return model, tokenizer
 
@@ -436,71 +427,6 @@ def setup_finetuning_oqa(train_path, val_path, config):
         max_len=config.max_length,
         padding=config.padding,
         subset="eval",
-    )
-
-    return config
-
-
-def format_answer(example):
-    example["answers"] = {
-        "answer_start": [example["target_start"]],
-        "text": [example["target"]],
-    }
-    return example
-
-
-def format_tacoma_qa(dataset):
-    # rename column
-    dataset = dataset.rename_column("text", "context")
-
-    # answer column
-    dataset = dataset.map(format_answer, batched=False)
-
-    dataset = dataset.remove_columns(["target", "target_start"])
-
-    return dataset
-
-
-def setup_finetuning_splinter_oqa(train_path, val_path, config, train_tacoma=False):
-    """
-        Setup function for fine-tuning BERT-like models on OQA-v1.0
-
-        Load and preprocess the training and validation data. Initialize the model and tokenizer. Returns the config
-    object which contains everything needed to instantiate a trainer and run.
-    """
-
-    config.train_dataset = Dataset.load_from_disk(train_path)
-    config.val_dataset = Dataset.load_from_disk(val_path)
-
-    if train_tacoma == True:
-        config.train_dataset = config.train_dataset.shuffle(seed=config.seed)
-        config.train_dataset = format_tacoma_qa(config.train_dataset)
-
-    logger.info("datasets loaded from disk")
-
-    config.model, config.tokenizer = splinter_init(
-        config.model_checkpoint, config.tokenizer_checkpoint
-    )
-
-    logger.info("model and tokenizer initialized")
-
-    config.train_batches = prepare_inputs(
-        config.train_dataset,
-        config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
-        padding=config.padding,
-        subset="train",
-        append_special_token=config.append_special_token,
-    )
-    config.val_batches = prepare_inputs(
-        config.val_dataset,
-        config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
-        padding=config.padding,
-        subset="eval",
-        append_special_token=config.append_special_token,
     )
 
     return config

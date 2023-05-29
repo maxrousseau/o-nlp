@@ -55,6 +55,7 @@ def main():
             dataset_config["val_dataset_path"],
             t5_config,
         )
+        print(t5_config)
         tuner = FinetuneT5(t5_config)
         tuner()
 
@@ -71,6 +72,7 @@ def main():
             dataset_config["test_dataset_path"], t5_config
         )
         # @HERE :: make sure setup function is good, then finish training loop
+        print(t5_config)
         evaluator = EvaluateT5(t5_config)
         evaluator()
 
@@ -93,6 +95,7 @@ def main():
             bart_config,
         )
         # @HERE :: make sure setup function is good, then finish training loop
+        print(bart_config)
         tuner = FinetuneBART(bart_config)
         tuner()
 
@@ -109,6 +112,7 @@ def main():
             dataset_config["test_dataset_path"], bart_config
         )
         # @HERE :: make sure setup function is good, then finish training loop
+        print(bart_config)
         evaluater = EvaluateBART(bart_config)
         evaluater()
 
@@ -127,7 +131,7 @@ def main():
         bert_config = bert_utils.setup_pretrain_bert(
             dataset_config["train_dataset_path"], bert_config
         )
-
+        print(bert_config)
         tuner = PretrainBERT(bert_config)
         tuner()
 
@@ -149,51 +153,8 @@ def main():
             dataset_config["val_dataset_path"],
             bert_config,
         )
-
+        print(bert_config)
         tuner = FinetuneBERT(bert_config)
-        tuner()
-
-    elif runmode == "splinter-finetune":
-        config = bert_utils.BERTCFG(
-            name=model_config["name"],
-            lr=hyperparameter_config["learning_rate"],
-            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
-            n_epochs=hyperparameter_config["num_epochs"],
-            model_checkpoint=model_config["checkpoint"],
-            tokenizer_checkpoint=tokenizer_config["checkpoint"],
-            checkpoint_savedir=misc_config["save_dir"],
-            max_length=model_config["max_seq_len"],
-            seed=hyperparameter_config["seed"],
-        )
-        config = bert_utils.setup_finetuning_splinter_oqa(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
-            config,
-        )
-        tuner = FinetuneSplinter(config)
-        tuner()
-
-    elif runmode == "bert-metatune":
-        config = bert_utils.BERTCFG(
-            name=model_config["name"],
-            lr=hyperparameter_config["learning_rate"],
-            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
-            n_epochs=hyperparameter_config["num_epochs"],
-            model_checkpoint=model_config["checkpoint"],
-            tokenizer_checkpoint=tokenizer_config["checkpoint"],
-            checkpoint_savedir=misc_config["save_dir"],
-            max_length=model_config["max_seq_len"],
-            seed=hyperparameter_config["seed"],
-        )
-        config = bert_utils.setup_metatune(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
-            config,
-            only_head=FLAGS.only_cls_head,
-        )
-        tuner = MetatuneBERT(
-            config, n_step_eval=100, stagnation_threshold=2, n_steps_nudge=4
-        )
         tuner()
 
     elif runmode == "bert-squad-finetune":
@@ -212,6 +173,7 @@ def main():
             dataset_config["val_dataset_path"],
             bert_config,
         )
+        print(bert_config)
         tuner = FinetuneBERT(bert_config)
         tuner()
 
@@ -227,6 +189,7 @@ def main():
             dataset_config["test_dataset_path"], bert_config
         )
 
+        print(bert_config)
         evaluater = EvaluateBERT(bert_config)
         evaluater()
 
@@ -249,6 +212,7 @@ def main():
         t5_config = t5_utils.setup_pretrain_t5(
             dataset_config["train_dataset_path"], t5_config
         )
+        print(t5_config)
         pretrainer = PretrainT5(t5_config)
         pretrainer()
 
