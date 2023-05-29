@@ -10,7 +10,7 @@ from models import t5_utils, t5_fp16_utils, bert_utils, bart_utils
 
 from tqdm.auto import tqdm
 
-from mage.generator import TacomaCollator
+from tacoma.generator import TacomaCollator
 
 from transformers import (
     get_scheduler,
