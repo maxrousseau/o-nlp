@@ -446,6 +446,9 @@ def setup_finetuning_oqa(train_path, val_path, config):
 
     logger.info("model and tokenizer initialized")
 
+    if config.bitfit:
+        config.model = apply_bitfit(config.model)
+
     config.train_batches = prepare_inputs(
         config.train_dataset,
         config.tokenizer,
