@@ -748,6 +748,7 @@ class FinetuneBERT(BaseTrainer):
         )
         f1_score = metrics["f1"]
         val_loss = np.array(val_losses).mean()
+        print(val_loss)
         accelerator.wait_for_everyone()
         return f1_score, val_loss
 
@@ -861,6 +862,7 @@ class FinetuneBERT(BaseTrainer):
             if val_loss < lowest_val_loss:
                 self.save_model(save_path)
                 lowest_val_loss = val_loss
+                best_f1 = f1_score
                 self.logger.info(
                     "New save with f1 = {} at lowest val loss".format(best_f1)
                 )
