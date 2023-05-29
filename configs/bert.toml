@@ -5,6 +5,7 @@ runmode = "bert-finetune"
 name = "bert-base-sft-default"
 max_seq_len = 512
 checkpoint = "bert-base-uncased"
+bitfit = true
 
 [dataset]
 train_dataset_path="./tmp/bin/train"

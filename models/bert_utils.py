@@ -167,7 +167,7 @@ def preprocess_training(
     tokenizer,
     padding="max_length",
     stride=128,
-    max_len=128,
+    max_len=512,
     append_special_token=False,
 ):
     """
@@ -259,7 +259,7 @@ def preprocess_validation(
     tokenizer,
     padding="max_length",
     stride=128,
-    max_len=128,
+    max_len=512,
     append_special_token=False,
 ):
     """preprocessing for evalutation samples (validation and test)
@@ -461,7 +461,7 @@ def setup_finetuning_oqa(train_path, val_path, config):
         stride=config.stride,
         max_len=config.max_length,
         padding=config.padding,
-        subset="eval",
+        subset="train",
     )
 
     return config
