@@ -214,7 +214,7 @@ class FinetuneT5(BaseTrainer):
         self.get_dataloaders()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
         wandb.init(
             project="o-nlp_experiments",
@@ -402,7 +402,7 @@ class PretrainT5(BaseTrainer):
         self.__get_dataloaders()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         local_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         best_val_loss = 100
@@ -782,7 +782,7 @@ class FinetuneBERT(BaseTrainer):
         self.__get_dataloaders()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         # experiment tracking
@@ -935,7 +935,7 @@ class FinetuneBART(BaseTrainer):
 
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         best_f1 = -1
@@ -1287,7 +1287,7 @@ class Setfit(SetFitTrainer):
     def __call__(self):
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
         save_path = os.path.abspath(
-            "{}-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
         )
 
         self.train(max_length=self.max_length)

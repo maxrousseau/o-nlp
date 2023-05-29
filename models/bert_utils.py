@@ -152,10 +152,8 @@ def apply_bitfit(model):
     for name, param in model.named_parameters():
         if name.startswith("qa_outputs"):
             param.requires_grad = True
-            print(name)
         elif name.endswith("bias"):
             param.requires_grad = True
-            print(name)
         else:
             param.requires_grad = False
 
