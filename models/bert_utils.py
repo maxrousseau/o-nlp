@@ -64,6 +64,7 @@ class BERTCFG:
     train_batches: Any = None
     test_batches: Any = None
 
+    bitfit: bool = False
     model: Any = None
     tokenizer: Any = None
 
@@ -76,6 +77,7 @@ BERT-like model configuration
         Tokenizer checkpoint : {}
         Max sequence length : {}
         Hyperparameters :
+                bitfit={},
                 lr={},
                 lr_scheduler={},
                 num_epochs={},
@@ -86,6 +88,7 @@ BERT-like model configuration
             self.model_checkpoint,
             self.tokenizer_checkpoint,
             self.max_length,
+            self.bitfit,
             self.lr,
             self.lr_scheduler,
             self.n_epochs,
@@ -128,6 +131,37 @@ def bert_mlm_init(model_checkpoint, tokenizer_chekpoint):
     model = AutoModelForMaskedLM.from_pretrained(model_checkpoint)
 
     return model, tokenizer
+
+
+def print_trainable_parameters(model):
+    """
+    Prints the number of trainable parameters in the model.
+    """
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+    )
+
+
+def apply_bitfit(model):
+    for name, param in model.named_parameters():
+        if name.startswith("qa_outputs"):
+            param.requires_grad = True
+            print(name)
+        elif name.endswith("bias"):
+            param.requires_grad = True
+            print(name)
+        else:
+            param.requires_grad = False
+
+    print_trainable_parameters(model)
+
+    return model
 
 
 def preprocess_training(
@@ -432,7 +466,7 @@ def setup_finetuning_oqa(train_path, val_path, config):
     return config
 
 
-def setup_finetuning_squad(val_path, config, only_head=False):
+def setup_finetuning_squad(val_path, config):
     squad = load_dataset(
         "squad", download_mode="force_redownload"
     )  # @BUG remove for caching
@@ -447,16 +481,10 @@ def setup_finetuning_squad(val_path, config, only_head=False):
         config.model_checkpoint, config.tokenizer_checkpoint
     )
 
-    if only_head:
-        for name, param in config.model.bert.named_parameters():
-            train_layers = ["8", "9", "10, 11"]
-            for l in train_layers:
-                if name.startswith("encoder.layer.{}".format(l)):
-                    param.requires_grad = True
-                else:
-                    param.requires_grad = False
-
     logger.info("model and tokenizer initialized")
+
+    if config.bitfit:
+        config.model = apply_bitfit(config.model)
 
     config.train_batches = prepare_inputs(
         config.train_dataset,
@@ -473,61 +501,6 @@ def setup_finetuning_squad(val_path, config, only_head=False):
         max_len=config.max_length,
         padding=config.padding,
         subset="eval",
-    )
-
-    return config
-
-
-def setup_metatune(train_path, val_path, config, only_head=False):
-    squad = load_dataset(
-        "squad",
-    )  # @BUG remove for caching
-    config.big_dataset = squad["train"]
-    config.train_dataset = Dataset.load_from_disk(train_path)
-    config.val_dataset = Dataset.load_from_disk(val_path)
-
-    # !bert
-
-    logger.info("datasets loaded from disk")
-
-    config.model, config.tokenizer = bert_init(
-        config.model_checkpoint, config.tokenizer_checkpoint
-    )
-
-    if only_head:
-        for name, param in config.model.bert.named_parameters():
-            train_layers = ["8", "9", "10, 11"]
-            for l in train_layers:
-                if name.startswith("encoder.layer.{}".format(l)):
-                    param.requires_grad = True
-                else:
-                    param.requires_grad = False
-
-    logger.info("model and tokenizer initialized")
-    config.big_batches = prepare_inputs(
-        config.big_dataset,
-        config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
-        padding=config.padding,
-        subset="train",
-    )
-
-    config.train_batches = prepare_inputs(
-        config.train_dataset,
-        config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
-        padding=config.padding,
-        subset="train",
-    )
-    config.val_batches = prepare_inputs(
-        config.val_dataset,
-        config.tokenizer,
-        stride=config.stride,
-        max_len=config.max_length,
-        padding=config.padding,
-        subset="train",
     )
 
     return config

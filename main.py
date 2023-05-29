@@ -146,6 +146,7 @@ def main():
             checkpoint_savedir=misc_config["save_dir"],
             max_length=model_config["max_seq_len"],
             seed=hyperparameter_config["seed"],
+            bitfit=model_config["bitfit"],
             append_special_token=tokenizer_config["append_special_tokens"],
         )
         bert_config = bert_utils.setup_finetuning_oqa(
