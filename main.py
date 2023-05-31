@@ -175,6 +175,8 @@ def main():
             teacher_tokenizer_checkpoint=tokenizer_config["teacher_checkpoint"],
             temperature=hyperparameter_config["temperature"],
             alpha=hyperparameter_config["alpha"],
+            train_batch_size=hyperparameter_config["training_batch_size"],
+            val_batch_size=hyperparameter_config["validation_batch_size"],
         )
         bert_config = bert_utils.setup_finetuning_oqa(
             dataset_config["train_dataset_path"],
