@@ -314,10 +314,12 @@ class TaskDistillationBERT(BaseTrainer):
     def __init__(self, config):
         """ """
         super().__init__(config)
-        self.temperature = 1  # from the KD paper, higher for
-        self.alpha = 0.2
+        self.temperature = config.temperature  # from the KD paper, higher for
+        self.alpha = config.alpha
         self.KD_loss = nn.KLDivLoss(reduction="batchmean")
-        self.teacher_checkpoint = None
+        self.teacher_model = config.teacher_model
+        self.teacher_tokenizer = config.teacher_tokenizer
+
         self.teacher_slogits = []
         self.teacher_elogits = []
 
