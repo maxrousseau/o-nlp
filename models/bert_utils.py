@@ -34,7 +34,7 @@ logger = logging.getLogger("bert-utils")
 logger.setLevel(logging.DEBUG)  # change level if debug or not
 
 
-@dataclass
+@dataclass(repr=False)
 class BERTCFG:
     name: str = "bert-default"
     lr: float = 2e-5
@@ -97,7 +97,7 @@ BERT-like model configuration
         return s
 
 
-@dataclass
+@dataclass(repr=False)
 class TaskDistillationCFG(BERTCFG):
     teacher_model_checkpoint: str = ""
     teacher_tokenizer_checkpoint: str = ""
