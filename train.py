@@ -348,7 +348,7 @@ class TaskDistillationBERT(BaseTrainer):
         )
         return total_loss
 
-    def __get_dataloaders(self):
+    def get_dataloaders(self):
 
         """"""
         train_tensor = self.train_batches.remove_columns(
@@ -389,7 +389,7 @@ class TaskDistillationBERT(BaseTrainer):
         )
 
     @torch.no_grad()
-    def __get_teacher_logits(self):
+    def get_teacher_logits(self):
         # compute the logits from the teacher and save to an array for training
         accelerator = Accelerator(mixed_precision="fp16")
         (
