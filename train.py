@@ -395,8 +395,8 @@ class TaskDistillationBERT(BaseTrainer):
         accelerator = Accelerator(mixed_precision="fp16")
         (
             self.teacher_model,
-            self.train_dataloader,
-        ) = accelerator.prepare(self.teacher_model, self.train_dataloader)
+            self.teacher_dataloader,
+        ) = accelerator.prepare(self.teacher_model, self.teacher_dataloader)
 
         self.teacher_model.eval()
         for i, batch in enumerate(tqdm(self.teacher_dataloader)):
