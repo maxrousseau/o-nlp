@@ -324,6 +324,38 @@ class TaskDistillationBERT(BaseTrainer):
         self.teacher_slogits = []
         self.teacher_elogits = []
 
+    @torch.no_grad()
+    def __eval(self, accelerator):
+        """ """
+        start_logits = []
+        end_logits = []
+
+        self.model.eval()
+        val_losses = []
+
+        for batch in tqdm(self.val_dataloader):
+            outputs = self.model(**batch)
+            start_logits.append(accelerator.gather(outputs.start_logits).cpu().numpy())
+            end_logits.append(accelerator.gather(outputs.end_logits).cpu().numpy())
+            val_losses.append(outputs.loss.detach().cpu().numpy())
+
+        start_logits = np.concatenate(start_logits)
+        end_logits = np.concatenate(end_logits)
+        start_logits = start_logits[: len(self.val_batches)]
+        end_logits = end_logits[: len(self.val_batches)]
+        metrics, unused, unused = bert_utils.answer_from_logits(
+            start_logits,
+            end_logits,
+            self.val_batches,
+            self.val_dataset,
+            self.tokenizer,
+        )
+        f1_score = metrics["f1"]
+        val_loss = np.array(val_losses).mean()
+        print(val_loss)
+        accelerator.wait_for_everyone()
+        return f1_score, val_loss
+
     def __kd_loss(
         self,
         student_loss,
@@ -409,7 +441,105 @@ class TaskDistillationBERT(BaseTrainer):
         # @TODO :: free up the memory
 
     def __call__(self):
-        return None
+        self.get_dataloaders()
+        self.get_teacher_logits()
+
+        # dataloaders
+        self.__get_dataloaders()
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        save_path = os.path.abspath(
+            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
+
+        # experiment tracking
+        # wandb.init(
+        #     project="o-nlp_experiments",
+        #     config={
+        #         "learning_rate": self.lr,
+        #         "architecture": self.name,
+        #         "dataset": "oqa",
+        #         "epochs": self.num_epochs,
+        #     },
+        # )
+
+        best_f1 = -1
+        lowest_val_loss = 100
+        optimizer = AdamW(self.model.parameters(), lr=self.lr)
+        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+
+        # accelerator
+        if self.lr_scheduler:
+            lr_scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=0.1 * num_training_steps,
+                num_training_steps=num_training_steps,
+            )
+        if torch.device != "cpu":
+            # @BUG mixed precision breaks generation
+            accelerator = Accelerator(mixed_precision="fp16")
+            (
+                self.model,
+                optimizer,
+                self.train_dataloader,
+                self.val_dataloader,
+            ) = accelerator.prepare(
+                self.model, optimizer, self.train_dataloader, self.val_dataloader
+            )
+            if self.lr_scheduler:
+                accelerator.register_for_checkpointing(lr_scheduler)
+
+        losses = {"train": []}
+
+        # training loop
+        progressbar = tqdm(range(num_training_steps))
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            for steps, batch in enumerate(self.train_dataloader):
+                outputs = self.model(**batch)
+                batch_id = steps - (num_update_steps_per_epoch * epoch)
+
+                loss = self.__kd_loss(
+                    outputs.loss,
+                    outputs.start_logits,
+                    outputs.end_logits,
+                    self.teacher_slogits[batch_id],
+                    self.teacher_elogits[batch_id],
+                )
+
+                accelerator.backward(loss)
+                losses["train"].append(loss.detach().cpu().numpy())
+
+                optimizer.step()
+                if self.lr_scheduler:
+                    lr_scheduler.step()
+                optimizer.zero_grad()
+                progressbar.update(1)
+            # eval
+            f1_score, val_loss = self.__eval(accelerator)
+            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+            # wandb.log(
+            #     {
+            #         "val_f1": f1_score,
+            #         "val_loss": val_loss,
+            #         "train_loss": np.array(losses["train"]).mean(),
+            #         "n_step": steps,
+            #     }
+            # )
+
+            # checkpointing (only best_val)
+            if val_loss < lowest_val_loss:
+                self.save_model(save_path)
+                lowest_val_loss = val_loss
+                best_f1 = f1_score
+                self.logger.info(
+                    "New save with f1 = {} at lowest val loss".format(best_f1)
+                )
+
+        self.logger.info(
+            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
+        )
 
 
 class PretrainT5(BaseTrainer):
