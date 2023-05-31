@@ -25,6 +25,9 @@ from sentence_transformers.losses import CosineSimilarityLoss
 from setfit import SetFitTrainer
 
 import torch
+import torch.nn.functional as F
+from torch.optim import Optimizer
+
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
@@ -306,6 +309,83 @@ class FinetuneT5(BaseTrainer):
 
 class TaskDistillationBERT(BaseTrainer):
     """@TODO ::  implement knowledge distillation from QA experts (teacher) to domain experts (student)"""
+
+    def __init__(self, config):
+        """ """
+        super().__init__(config)
+        self.temperature = 1  # from the KD paper, higher for
+        self.alpha = 0.2
+        self.KD_loss = nn.KLDivLoss(reduction="batchmean")
+        self.teacher = None
+
+    def __kd_loss(
+        self,
+        student_loss,
+        student_start_logits,
+        student_end_logits,
+        teacher_start_logits,
+        teacher_end_logits,
+    ):
+
+        # NOTE :: idk why the log_softmax for the student?...
+        start_loss = KD_loss(
+            input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+        )
+
+        end_loss = KD_loss(
+            input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+        )
+
+        total_loss = student_loss * self.alpha + (1 - self.alpha) * (
+            start_loss + end_loss
+        )
+        return total_loss
+
+    def __get_dataloaders(self):
+
+        """"""
+        train_tensor = self.train_batches.remove_columns(
+            ["example_id", "offset_mapping"]
+        )
+        train_tensor.set_format("torch")
+        self.train_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=default_data_collator,
+            batch_size=self.train_batch_size,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
+        val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
+        val_tensor.set_format("torch")
+        self.val_dataloader = DataLoader(
+            val_tensor,
+            collate_fn=default_data_collator,
+            batch_size=self.val_batch_size,
+            shuffle=False,
+        )
+
+    @torch.no_grad()
+    def __get_teacher_logits(self):
+        # compute the logits from the teacher and save to an array for training
+        self.teacher_slogits = []
+        self.teacher_elogits = []
+
+        self.teacher.eval()
+        for i, batch in enumerate(self.train_dataloader):
+            outputs = self.model(**batch)
+            start_logits.append(accelerator.gather(outputs.start_logits))
+            end_logits.append(accelerator.gather(outputs.end_logits))
+
+        del self.teacher
+        # @TODO :: free up the memory
+
+    def __call__(self):
+        return None
 
 
 class PretrainT5(BaseTrainer):
