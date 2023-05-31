@@ -99,8 +99,8 @@ BERT-like model configuration
 
 @dataclass
 class TaskDistillationCFG(BERTCFG):
-    teacher_model_checkpoint: str
-    teacher_tokenizer_checkpoint: str
+    teacher_model_checkpoint: str = ""
+    teacher_tokenizer_checkpoint: str = ""
 
     teacher_batches: Any = None
 
