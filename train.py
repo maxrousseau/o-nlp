@@ -25,6 +25,7 @@ from sentence_transformers.losses import CosineSimilarityLoss
 from setfit import SetFitTrainer
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Optimizer
 
@@ -316,7 +317,9 @@ class TaskDistillationBERT(BaseTrainer):
         self.temperature = 1  # from the KD paper, higher for
         self.alpha = 0.2
         self.KD_loss = nn.KLDivLoss(reduction="batchmean")
-        self.teacher = None
+        self.teacher_checkpoint = None
+        self.teacher_slogits = []
+        self.teacher_elogits = []
 
     def __kd_loss(
         self,
@@ -328,12 +331,12 @@ class TaskDistillationBERT(BaseTrainer):
     ):
 
         # NOTE :: idk why the log_softmax for the student?...
-        start_loss = KD_loss(
+        start_loss = self.KD_loss(
             input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
             target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
         )
 
-        end_loss = KD_loss(
+        end_loss = self.KD_loss(
             input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
             target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
         )
@@ -360,6 +363,20 @@ class TaskDistillationBERT(BaseTrainer):
             generator=self.g,
         )
 
+        teacher_tensor = self.teacher_batches.remove_columns(
+            ["example_id", "offset_mapping"]
+        )
+        teacher_tensor.set_format("torch")
+        self.teacher_dataloader = DataLoader(
+            train_tensor,
+            shuffle=True,
+            collate_fn=default_data_collator,
+            batch_size=self.train_batch_size,
+            num_workers=0,
+            worker_init_fn=self.seed_worker,
+            generator=self.g,
+        )
+
         val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
         val_tensor.set_format("torch")
         self.val_dataloader = DataLoader(
@@ -372,16 +389,20 @@ class TaskDistillationBERT(BaseTrainer):
     @torch.no_grad()
     def __get_teacher_logits(self):
         # compute the logits from the teacher and save to an array for training
-        self.teacher_slogits = []
-        self.teacher_elogits = []
+        accelerator = Accelerator(mixed_precision="fp16")
+        (
+            self.teacher_model,
+            self.train_dataloader,
+        ) = accelerator.prepare(self.teacher_model, self.train_dataloader)
 
-        self.teacher.eval()
-        for i, batch in enumerate(self.train_dataloader):
+        self.teacher_model.eval()
+        for i, batch in enumerate(self.teacher_dataloader):
             outputs = self.model(**batch)
-            start_logits.append(accelerator.gather(outputs.start_logits))
-            end_logits.append(accelerator.gather(outputs.end_logits))
+            self.teacher_slogits.append(accelerator.gather(outputs.start_logits))
+            self.teacher_elogits.append(accelerator.gather(outputs.end_logits))
 
-        del self.teacher
+        del self.teacher_model
+        del accelerator
         # @TODO :: free up the memory
 
     def __call__(self):

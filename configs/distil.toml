@@ -1,0 +1,32 @@
+[mode]
+runmode = "bert-taskdistil"
+
+[model]
+name = "pubmedbert-task-distil"
+max_seq_len = 512
+checkpoint = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+bitfit = false
+teacher_checkpoint = "bert-large-uncased-whole-word-masking-finetuned-squad"
+
+[dataset]
+train_dataset_path="./tmp/bin/train"
+val_dataset_path="./tmp/bin/val"
+test_dataset_path="./tmp/bin/test"
+
+
+[tokenizer]
+checkpoint = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+teacher_checkpoint = "bert-large-uncased-whole-word-masking-finetuned-squad"
+
+[hyperparameters]
+learning_rate = 3e-4
+learning_rate_scheduler = False
+num_epochs = 10
+training_batch_size = 16
+validation_batch_size = 16
+seed = 0
+temperature = 1.0
+alpha = 0.3
+
+[misc]
+save_dir = "./"

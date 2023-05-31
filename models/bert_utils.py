@@ -97,6 +97,20 @@ BERT-like model configuration
         return s
 
 
+@dataclass
+class TaskDistillationCFG(BERTCFG):
+    teacher_model_checkpoint: str
+    teacher_tokenizer_checkpoint: str
+
+    teacher_batches: Any = None
+
+    temperature: float = 1.0
+    alpha: float = 0.3
+
+    teacher_model: Any = None
+    teacher_tokenizer: Any = None
+
+
 def tacoma_mlm_init(
     model_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
     tokenizer_checkpoint="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
@@ -425,6 +439,62 @@ def prepare_inputs(
         raise Exception("Specify subset for data preparation")
 
 
+def setup_taskdistil_oqa(train_path, val_path, config):
+    """
+        Setup function for fine-tuning BERT-like models on OQA-v1.0
+
+        Load and preprocess the training and validation data. Initialize the model and tokenizer. Returns the config
+    object which contains everything needed to instantiate a trainer and run.
+    """
+
+    config.train_dataset = Dataset.load_from_disk(train_path)
+    config.val_dataset = Dataset.load_from_disk(val_path)
+
+    logger.info("datasets loaded from disk")
+
+    config.model, config.tokenizer = bert_init(
+        config.model_checkpoint, config.tokenizer_checkpoint
+    )
+
+    config.teacher_model, config.teacher_tokenizer = bert_init(
+        config.teacher_model_checkpoint, config.teacher_tokenizer_checkpoint
+    )
+
+    logger.info("model and tokenizer initialized")
+
+    if config.bitfit:
+        config.model = apply_bitfit(config.model)
+
+    config.train_batches = prepare_inputs(
+        config.train_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+
+    config.teacher_batches = prepare_inputs(
+        config.train_dataset,
+        config.teacher_tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+
+    config.val_batches = prepare_inputs(
+        config.val_dataset,
+        config.tokenizer,
+        stride=config.stride,
+        max_len=config.max_length,
+        padding=config.padding,
+        subset="train",
+    )
+
+    return config
+
+
 def setup_finetuning_oqa(train_path, val_path, config):
     """
         Setup function for fine-tuning BERT-like models on OQA-v1.0
@@ -454,6 +524,7 @@ def setup_finetuning_oqa(train_path, val_path, config):
         max_len=config.max_length,
         padding=config.padding,
         subset="train",
+        append_special_token=config.append_special_token,
     )
     config.val_batches = prepare_inputs(
         config.val_dataset,
@@ -462,6 +533,7 @@ def setup_finetuning_oqa(train_path, val_path, config):
         max_len=config.max_length,
         padding=config.padding,
         subset="train",
+        append_special_token=config.append_special_token,
     )
 
     return config

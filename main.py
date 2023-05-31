@@ -158,6 +158,33 @@ def main():
         tuner = FinetuneBERT(bert_config)
         tuner()
 
+    elif runmode == "bert-taskdistil":
+        bert_config = bert_utils.TaskDistillationCFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_length=model_config["max_seq_len"],
+            seed=hyperparameter_config["seed"],
+            bitfit=model_config["bitfit"],
+            append_special_token=tokenizer_config["append_special_tokens"],
+            teacher_model_checkpoint=model_config["teacher_checkpoint"],
+            teacher_tokenizer_checkpoint=tokenizer_config["teacher_checkpoint"],
+            temperature=hyperparameter_config["temperature"],
+            alpha=hyperparameter_config["alpha"],
+        )
+        bert_config = bert_utils.setup_finetuning_oqa(
+            dataset_config["train_dataset_path"],
+            dataset_config["val_dataset_path"],
+            bert_config,
+        )
+        print(bert_config)
+        tuner = TaskDistillationBERT(bert_config)
+        tuner()
+
     elif runmode == "bert-squad-finetune":
         bert_config = bert_utils.BERTCFG(
             name=model_config["name"],
