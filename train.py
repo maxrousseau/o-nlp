@@ -452,15 +452,15 @@ class TaskDistillationBERT(BaseTrainer):
         )
 
         # experiment tracking
-        # wandb.init(
-        #     project="o-nlp_experiments",
-        #     config={
-        #         "learning_rate": self.lr,
-        #         "architecture": self.name,
-        #         "dataset": "oqa",
-        #         "epochs": self.num_epochs,
-        #     },
-        # )
+        wandb.init(
+            project="o-nlp_experiments",
+            config={
+                "learning_rate": self.lr,
+                "architecture": self.name,
+                "dataset": "oqa",
+                "epochs": self.num_epochs,
+            },
+        )
 
         best_f1 = -1
         lowest_val_loss = 100
@@ -507,7 +507,6 @@ class TaskDistillationBERT(BaseTrainer):
                     self.teacher_elogits[steps],
                 )
                 print(loss)
-
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
 
@@ -519,14 +518,14 @@ class TaskDistillationBERT(BaseTrainer):
             # eval
             f1_score, val_loss = self.__eval(accelerator)
             self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-            # wandb.log(
-            #     {
-            #         "val_f1": f1_score,
-            #         "val_loss": val_loss,
-            #         "train_loss": np.array(losses["train"]).mean(),
-            #         "n_step": steps,
-            #     }
-            # )
+            wandb.log(
+                {
+                    "val_f1": f1_score,
+                    "val_loss": val_loss,
+                    "train_loss": np.array(losses["train"]).mean(),
+                    "n_step": steps,
+                }
+            )
 
             # checkpointing (only best_val)
             if val_loss < lowest_val_loss:
