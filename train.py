@@ -316,6 +316,7 @@ class TaskDistillationBERT(BaseTrainer):
         super().__init__(config)
         self.temperature = config.temperature  # from the KD paper, higher for
         self.alpha = config.alpha
+        self.teacher_batches = config.teacher_batches
         self.KD_loss = nn.KLDivLoss(reduction="batchmean")
         self.teacher_model = config.teacher_model
         self.teacher_tokenizer = config.teacher_tokenizer
