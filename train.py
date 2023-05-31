@@ -400,7 +400,7 @@ class TaskDistillationBERT(BaseTrainer):
 
         self.teacher_model.eval()
         for i, batch in enumerate(tqdm(self.teacher_dataloader)):
-            outputs = self.model(**batch)
+            outputs = self.teacher_model(**batch)
             self.teacher_slogits.append(accelerator.gather(outputs.start_logits))
             self.teacher_elogits.append(accelerator.gather(outputs.end_logits))
 
