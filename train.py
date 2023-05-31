@@ -445,7 +445,7 @@ class TaskDistillationBERT(BaseTrainer):
         self.get_teacher_logits()
 
         # dataloaders
-        self.__get_dataloaders()
+
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_path = os.path.abspath(
             "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
