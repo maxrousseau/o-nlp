@@ -499,6 +499,7 @@ class TaskDistillationBERT(BaseTrainer):
             for steps, batch in enumerate(self.train_dataloader):
                 outputs = self.model(**batch)
                 batch_id = steps - (num_update_steps_per_epoch * epoch)
+                print(batch_id)
 
                 loss = self.__kd_loss(
                     outputs.loss,
@@ -507,6 +508,7 @@ class TaskDistillationBERT(BaseTrainer):
                     self.teacher_slogits[batch_id],
                     self.teacher_elogits[batch_id],
                 )
+                print(loss)
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
