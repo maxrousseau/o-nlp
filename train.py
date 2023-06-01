@@ -537,6 +537,9 @@ class TaskDistillationBERT(BaseTrainer):
                             "New save with f1 = {} at lowest val loss".format(best_f1)
                         )
 
+        self.save_model(
+            "{}FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+        )
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )
