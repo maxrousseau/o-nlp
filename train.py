@@ -386,6 +386,7 @@ class TaskDistillationBERT(BaseTrainer):
         )
 
         loss_ce = (start_loss + end_loss) / 2.0
+        print(loss_ce)
 
         total_loss = student_loss * self.alpha + (1 - self.alpha) * loss_ce
 
