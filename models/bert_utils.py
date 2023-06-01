@@ -439,6 +439,26 @@ def prepare_inputs(
         raise Exception("Specify subset for data preparation")
 
 
+def format_answer(example):
+    example["answers"] = {
+        "answer_start": [example["target_start"]],
+        "text": [example["target"]],
+    }
+    return example
+
+
+def format_tacoma_qa(dataset):
+    # rename column
+    dataset = dataset.rename_column("text", "context")
+
+    # answer column
+    dataset = dataset.map(format_answer, batched=False)
+
+    dataset = dataset.remove_columns(["target", "target_start"])
+
+    return dataset
+
+
 def setup_taskdistil_oqa(train_path, val_path, config):
     """
         Setup function for fine-tuning BERT-like models on OQA-v1.0
@@ -449,6 +469,10 @@ def setup_taskdistil_oqa(train_path, val_path, config):
 
     config.train_dataset = Dataset.load_from_disk(train_path)
     config.val_dataset = Dataset.load_from_disk(val_path)
+
+    if True:
+        config.train_dataset = config.train_dataset.shuffle(seed=config.seed)
+        config.train_dataset = format_tacoma_qa(config.train_dataset)
 
     logger.info("datasets loaded from disk")
 
