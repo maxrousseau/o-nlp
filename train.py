@@ -506,7 +506,7 @@ class TaskDistillationBERT(BaseTrainer):
                     self.teacher_slogits[steps],
                     self.teacher_elogits[steps],
                 )
-                print(loss)
+
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
 
