@@ -400,7 +400,7 @@ class TaskDistillationBERT(BaseTrainer):
         train_tensor.set_format("torch")
         self.train_dataloader = DataLoader(
             train_tensor,
-            shuffle=True,
+            shuffle=False,
             collate_fn=default_data_collator,
             batch_size=self.train_batch_size,
             num_workers=0,
