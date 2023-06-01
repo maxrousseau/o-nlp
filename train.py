@@ -365,20 +365,30 @@ class TaskDistillationBERT(BaseTrainer):
         teacher_end_logits,
     ):
 
+        assert student_start_logits.size() == teacher_start_logits.size()
+        assert student_end_logits.size() == teacher_end_logits.size()
+
         # NOTE :: idk why the log_softmax for the student?...
-        start_loss = self.KD_loss(
-            input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
-            target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+        start_loss = (
+            self.KD_loss(
+                input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
+                target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+            )
+            * (self.temperature ** 2)
         )
 
-        end_loss = self.KD_loss(
-            input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
-            target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+        end_loss = (
+            self.KD_loss(
+                input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
+                target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+            )
+            * (self.temperature ** 2)
         )
 
-        total_loss = student_loss * self.alpha + (1 - self.alpha) * (
-            start_loss + end_loss
-        )
+        loss_ce = (start_loss + end_loss) / 2.0
+
+        total_loss = student_loss * self.alpha + (1 - self.alpha) * loss_ce
+
         return total_loss
 
     def get_dataloaders(self):
