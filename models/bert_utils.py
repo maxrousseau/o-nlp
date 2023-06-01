@@ -453,7 +453,8 @@ def format_tacoma_qa(dataset):
 
     # answer column
     dataset = dataset.map(format_answer, batched=False)
-    dataset["id"] = range(len(dataset))
+    idx = Dataset.from_dict({"id": range(len(dataset))})
+    dataset = datasets.concatenate_datasets([dataset, idx], axis=1)
 
     dataset = dataset.remove_columns(["target", "target_start"])
 
