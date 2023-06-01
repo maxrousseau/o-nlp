@@ -191,11 +191,9 @@ def preprocess_training(
             features: ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id', 'start_position', 'end_position']
     """
     if append_special_token:
-        questions = []
-        contexts = []
-        for i in range(len(examples)):
-            questions.append(tokenizer.mask_token + examples["question"][i].strip())
-            contexts.append(tokenizer.mask_token + examples["context"][i])
+        # @BROKEN !!!
+        questions = [tokenizer.mask_token + q.strip() for q in examples["question"]]
+        contexts = [tokenizer.mask_token + c.strip() for c in examples["context"]]
     else:
         questions = [q.strip() for q in examples["question"]]
         contexts = examples["context"]
@@ -464,7 +462,7 @@ def format_tacoma_qa(dataset):
     return dataset
 
 
-def setup_taskdistil_oqa(train_path, val_path, config):
+def setup_taskdistil_oqa(train_path, val_path, config, tacoma=False):
     """
         Setup function for fine-tuning BERT-like models on OQA-v1.0
 
@@ -475,7 +473,7 @@ def setup_taskdistil_oqa(train_path, val_path, config):
     config.train_dataset = Dataset.load_from_disk(train_path)
     config.val_dataset = Dataset.load_from_disk(val_path)
 
-    if True:
+    if tacoma:
         config.train_dataset = config.train_dataset.shuffle(seed=config.seed)
         config.train_dataset = format_tacoma_qa(config.train_dataset)
 
