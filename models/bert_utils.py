@@ -191,8 +191,10 @@ def preprocess_training(
             features: ['example_id', 'offset_mapping', 'attention_mask', 'token_type_id', 'start_position', 'end_position']
     """
     if append_special_token:
-        questions = tokenizer.mask_token + [q.strip() for q in examples["question"]]
-        contexts = tokenizer.mask_token + examples["context"]
+        questions = str(tokenizer.mask_token) + [
+            q.strip() for q in examples["question"]
+        ]
+        contexts = str(tokenizer.mask_token) + examples["context"]
     else:
         questions = [q.strip() for q in examples["question"]]
         contexts = examples["context"]
