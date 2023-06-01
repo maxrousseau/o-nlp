@@ -408,19 +408,19 @@ class TaskDistillationBERT(BaseTrainer):
             generator=self.g,
         )
 
-        teacher_tensor = self.teacher_batches.remove_columns(
-            ["example_id", "offset_mapping"]
-        )
-        teacher_tensor.set_format("torch")
-        self.teacher_dataloader = DataLoader(
-            train_tensor,
-            shuffle=True,
-            collate_fn=default_data_collator,
-            batch_size=self.train_batch_size,
-            num_workers=0,
-            worker_init_fn=self.seed_worker,
-            generator=self.g,
-        )
+        # teacher_tensor = self.teacher_batches.remove_columns(
+        #     ["example_id", "offset_mapping"]
+        # )
+        # teacher_tensor.set_format("torch")
+        # self.teacher_dataloader = DataLoader(
+        #     train_tensor,
+        #     shuffle=True,
+        #     collate_fn=default_data_collator,
+        #     batch_size=self.train_batch_size,
+        #     num_workers=0,
+        #     worker_init_fn=self.seed_worker,
+        #     generator=self.g,
+        # )
 
         val_tensor = self.val_batches.remove_columns(["example_id", "offset_mapping"])
         val_tensor.set_format("torch")
@@ -437,11 +437,11 @@ class TaskDistillationBERT(BaseTrainer):
         accelerator = Accelerator(mixed_precision="fp16")
         (
             self.teacher_model,
-            self.teacher_dataloader,
-        ) = accelerator.prepare(self.teacher_model, self.teacher_dataloader)
+            self.train_dataloader,
+        ) = accelerator.prepare(self.teacher_model, self.train_dataloader)
 
         self.teacher_model.eval()
-        for i, batch in enumerate(tqdm(self.teacher_dataloader)):
+        for i, batch in enumerate(tqdm(self.train_dataloader)):
             outputs = self.teacher_model(**batch)
             self.teacher_slogits.append(accelerator.gather(outputs.start_logits))
             self.teacher_elogits.append(accelerator.gather(outputs.end_logits))
