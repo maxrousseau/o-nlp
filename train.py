@@ -515,26 +515,27 @@ class TaskDistillationBERT(BaseTrainer):
                     lr_scheduler.step()
                 optimizer.zero_grad()
                 progressbar.update(1)
-            # eval
-            f1_score, val_loss = self.__eval(accelerator)
-            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-            wandb.log(
-                {
-                    "val_f1": f1_score,
-                    "val_loss": val_loss,
-                    "train_loss": np.array(losses["train"]).mean(),
-                    "n_step": steps,
-                }
-            )
+                # eval
+                if steps % 50 == 0:
+                    f1_score, val_loss = self.__eval(accelerator)
+                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+                    wandb.log(
+                        {
+                            "val_f1": f1_score,
+                            "val_loss": val_loss,
+                            "train_loss": np.array(losses["train"]).mean(),
+                            "n_step": steps,
+                        }
+                    )
 
-            # checkpointing (only best_val)
-            if val_loss < lowest_val_loss:
-                self.save_model(save_path)
-                lowest_val_loss = val_loss
-                best_f1 = f1_score
-                self.logger.info(
-                    "New save with f1 = {} at lowest val loss".format(best_f1)
-                )
+                    # checkpointing (only best_val)
+                    if val_loss < lowest_val_loss:
+                        self.save_model(save_path)
+                        lowest_val_loss = val_loss
+                        best_f1 = f1_score
+                        self.logger.info(
+                            "New save with f1 = {} at lowest val loss".format(best_f1)
+                        )
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
