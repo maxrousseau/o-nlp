@@ -516,26 +516,26 @@ class TaskDistillationBERT(BaseTrainer):
                 optimizer.zero_grad()
                 progressbar.update(1)
                 # eval
-                if steps % 50 == 0:
-                    f1_score, val_loss = self.__eval(accelerator)
-                    self.logger.info("steps {} : f1 {}".format(steps, f1_score))
-                    wandb.log(
-                        {
-                            "val_f1": f1_score,
-                            "val_loss": val_loss,
-                            "train_loss": np.array(losses["train"]).mean(),
-                            "n_step": steps,
-                        }
-                    )
+                # if steps % 50 == 0:
+            f1_score, val_loss = self.__eval(accelerator)
+            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+            wandb.log(
+                {
+                    "val_f1": f1_score,
+                    "val_loss": val_loss,
+                    "train_loss": np.array(losses["train"]).mean(),
+                    "n_step": steps,
+                }
+            )
 
-                    # checkpointing (only best_val)
-                    if val_loss < lowest_val_loss:
-                        self.save_model(save_path)
-                        lowest_val_loss = val_loss
-                        best_f1 = f1_score
-                        self.logger.info(
-                            "New save with f1 = {} at lowest val loss".format(best_f1)
-                        )
+            # checkpointing (only best_val)
+            if val_loss < lowest_val_loss:
+                self.save_model(save_path)
+                lowest_val_loss = val_loss
+                best_f1 = f1_score
+                self.logger.info(
+                    "New save with f1 = {} at lowest val loss".format(best_f1)
+                )
 
         self.save_model(
             "{}FINAL-{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
