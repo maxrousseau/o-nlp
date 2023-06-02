@@ -447,7 +447,7 @@ class TaskDistillationBERT(BaseTrainer):
             outputs = self.teacher_model(**batch)
             self.teacher_slogits.append(accelerator.gather(outputs.start_logits))
             self.teacher_elogits.append(accelerator.gather(outputs.end_logits))
-            self.teacher_input_ids.append(batch[0]["input_ids"])
+            self.teacher_input_ids.append(batch["input_ids"][0])
 
         del self.teacher_model
         del accelerator
@@ -519,7 +519,7 @@ class TaskDistillationBERT(BaseTrainer):
                     self.teacher_slogits[steps],
                     self.teacher_elogits[steps],
                 )
-                assert batch[0]["input_ids"] == self.teacher_input_ids[steps]
+                assert batch["input_ids"][0] == self.teacher_input_ids[steps]
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
