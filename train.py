@@ -372,7 +372,7 @@ class TaskDistillationBERT(BaseTrainer):
         # NOTE :: idk why the log_softmax for the student?...
         start_loss = (
             self.KD_loss(
-                input=F.softmax(student_start_logits / self.temperature, dim=-1),
+                input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
                 target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
             )
             * (self.temperature ** 2)
@@ -380,7 +380,7 @@ class TaskDistillationBERT(BaseTrainer):
 
         end_loss = (
             self.KD_loss(
-                input=F.softmax(student_end_logits / self.temperature, dim=-1),
+                input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
                 target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
             )
             * (self.temperature ** 2)

@@ -470,7 +470,9 @@ def setup_taskdistil_oqa(train_path, val_path, config, tacoma=False):
     object which contains everything needed to instantiate a trainer and run.
     """
 
-    config.train_dataset = Dataset.load_from_disk(train_path).shuffle(seed=config.seed)
+    config.train_dataset = (
+        Dataset.load_from_disk(train_path).shuffle(seed=config.seed).select([0])
+    )
     config.val_dataset = Dataset.load_from_disk(val_path)
 
     if tacoma:
