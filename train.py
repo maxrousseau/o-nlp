@@ -519,7 +519,7 @@ class TaskDistillationBERT(BaseTrainer):
                     self.teacher_slogits[steps],
                     self.teacher_elogits[steps],
                 )
-                assert batch["input_ids"][0] == self.teacher_input_ids[steps]
+                assert torch.equal(batch["input_ids"][0], self.teacher_input_ids[steps])
 
                 accelerator.backward(loss)
                 losses["train"].append(loss.detach().cpu().numpy())
