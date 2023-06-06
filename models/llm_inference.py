@@ -31,3 +31,8 @@ class GpuInference:
     model_name: str = None
     int8: bool = True
     num_samples: int = 12
+    # options: T0pp, UnifiedQAv2 or FLAN for the T5 like models
+    # otherwise -> GPT2-XL, GPT-J, LLaMa, MPT, etc.
+
+    # @HERE :: start with unifiedqav2-large (int8 inference, should be enough if a good generation strategy is chosen,
+    # then scale up as needed)...
