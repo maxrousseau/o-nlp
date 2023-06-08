@@ -16,23 +16,41 @@ from accelerate import init_empty_weights
 
 import torch
 
+# https://huggingface.co/spaces/evaluate-metric/f1 just implement a simple evaluate metric
+"""
+short term goal:
+1. implement t5 int8 inference (dataloader, prompt formating, f1)
+2. find a good generation strategy
+3. figure out maximum F1 on the training set for n=5, 10, 20 with unifiedqav2-large (If close to 100%, move to next step)
+"""
+
 
 @dataclass(repr=False)
 class Prompt:
     fmt: str = None  # ICL, QA, Instruct
     samples: Any = None  # list of sample prompts
 
-    def _t0(self):
-        """ """
+    def _t0(self, question, context):
+        """
+        https://github.com/bigscience-workshop/promptsource/blob/main/promptsource/templates/squad/templates.yaml"""
+        template = f"""
+Refer to the passage below and answer the following question:\n\nPassage: {context}\n\nQuestion: {question}
+        """
+        return template
 
-    def _uniqa(self):
+    def _uniqa(self, question, context):
         """ """
+        template = f"{question}\n{context}"
+        return template
 
-    def _flan(self):
+    def _flan(self, question, context):
         """ """
+        template = f"Read this and answer the question.\n\n{context}\n\n{question}"
+        return template
 
     def parse(self):
         """format inputs and return as a dataset with the correct prompt format for generation"""
+
         return None
 
 
