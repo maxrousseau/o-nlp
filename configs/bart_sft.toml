@@ -1,0 +1,29 @@
+# pubmedbert supervised fine-tuning for OQA
+[mode]
+runmode = "bart-finetune"
+
+[model]
+name = "bart-base-sft-default"
+max_seq_len = 1024
+checkpoint = "facebook/bart-base"
+bitfit = false
+
+[dataset]
+train_dataset_path="./tmp/bin/train"
+val_dataset_path="./tmp/bin/val"
+test_dataset_path="./tmp/bin/test"
+
+
+[tokenizer]
+checkpoint = "facebook/bart-base"
+
+[hyperparameters]
+learning_rate = 2e-5
+learning_rate_scheduler = false
+num_epochs = 10
+training_batch_size = 4
+validation_batch_size = 4
+seed = 0
+
+[misc]
+save_dir = "./"

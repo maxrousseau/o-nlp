@@ -229,12 +229,6 @@ class FinetuneT5(BaseTrainer):
                 "epochs": self.num_epochs,
             },
         )
-        # self.model, percent_reset = t5_fp16_utils.search_and_reset_layers(
-        #     self.model, self.tokenizer, scale_down_factor=2, revert_old=False
-        # )
-        # self.logger.info(
-        #     "T5 fp16 conversion: {}% of model params reset".format(percent_reset)
-        # )
 
         # training loop **************************************************
 
@@ -254,7 +248,7 @@ class FinetuneT5(BaseTrainer):
             # @BUG mixed precision breaks t5
             # mixed_precision="bf16" ? issues witht T5 models...
             # accelerator = Accelerator(mixed_precision="fp16")
-            accelerator = Accelerator()
+            accelerator = Accelerator(mixed_precision="bf16")
             (
                 self.model,
                 optimizer,
@@ -682,8 +676,7 @@ class PretrainT5(BaseTrainer):
             )
 
         if torch.device != "cpu":
-            # @BUG mixed precision breaks generation
-            accelerator = Accelerator()
+            accelerator = Accelerator(mixed_precision="bf16")
             (
                 self.model,
                 optimizer,
@@ -1474,10 +1467,7 @@ class EvaluateT5(BaseTester):
     @torch.no_grad()
     def __call__(self):
         self.get_dataloaders()
-        self.model, percent_reset = t5_fp16_utils.search_and_reset_layers(
-            self.model, self.tokenizer, scale_down_factor=2, revert_old=False
-        )
-        accelerator = Accelerator(mixed_precision="fp16")
+        accelerator = Accelerator(mixed_precision="bf16")
         (
             self.model,
             self.test_dataloader,

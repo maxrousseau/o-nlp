@@ -1,10 +1,11 @@
+# pubmedbert supervised fine-tuning for OQA
 [mode]
 runmode = "bert-finetune"
 
 [model]
-name = "bert-base-sft-default"
+name = "biobert-base-sft-default"
 max_seq_len = 512
-checkpoint = "bert-base-uncased"
+checkpoint = "dmis-lab/biobert-base-cased-v1.2"
 bitfit = false
 
 [dataset]
@@ -14,7 +15,7 @@ test_dataset_path="./tmp/bin/test"
 
 
 [tokenizer]
-checkpoint = "bert-base-uncased"
+checkpoint = "dmis-lab/biobert-base-cased-v1.2"
 
 [hyperparameters]
 learning_rate = 2e-5

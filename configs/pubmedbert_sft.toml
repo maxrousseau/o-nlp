@@ -1,1 +1,29 @@
 # pubmedbert supervised fine-tuning for OQA
+[mode]
+runmode = "bert-finetune"
+
+[model]
+name = "pubmedbert-base-sft-default"
+max_seq_len = 512
+checkpoint = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+bitfit = false
+
+[dataset]
+train_dataset_path="./tmp/bin/train"
+val_dataset_path="./tmp/bin/val"
+test_dataset_path="./tmp/bin/test"
+
+
+[tokenizer]
+checkpoint = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+
+[hyperparameters]
+learning_rate = 2e-5
+learning_rate_scheduler = true
+num_epochs = 10
+training_batch_size = 8
+validation_batch_size = 8
+seed = 0
+
+[misc]
+save_dir = "./"
