@@ -1,6 +1,6 @@
 import logging
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 import collections
 
 import numpy as np
@@ -16,6 +16,7 @@ from accelerate import init_empty_weights
 
 import torch
 
+
 # https://huggingface.co/spaces/evaluate-metric/f1 just implement a simple evaluate metric
 """
 short term goal:
@@ -25,33 +26,46 @@ short term goal:
 """
 
 
-@dataclass(repr=False)
 class Prompt:
-    fmt: str = None  # ICL, QA, Instruct
-    samples: Any = None  # list of sample prompts
+    def __init__(self, fmt, dataset):
+        self.fmt = fmt  # ICL, QA, Instruc
+        self.dataset = dataset
+        self.samples = {"answer": [], "prompt": []}
 
-    def _t0(self, question, context):
+    def _t0(self, example):
         """
         https://github.com/bigscience-workshop/promptsource/blob/main/promptsource/templates/squad/templates.yaml"""
-        template = f"""
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(
+            f"""
 Refer to the passage below and answer the following question:\n\nPassage: {context}\n\nQuestion: {question}
         """
-        return template
+        )
 
-    def _uniqa(self, question, context):
+    def _uniqa(self, example):
         """ """
-        template = f"{question}\n{context}"
-        return template
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(f"{question}\n{context}")
 
-    def _flan(self, question, context):
+    def _flan(self, example):
         """ """
-        template = f"Read this and answer the question.\n\n{context}\n\n{question}"
-        return template
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(
+            f"Read this and answer the question.\n\n{context}\n\n{question}"
+        )
 
     def parse(self):
         """format inputs and return as a dataset with the correct prompt format for generation"""
+        for e in self.dataset:
+            eval("self._" + self.fmt + "(e)")
 
-        return None
+        return Dataset.from_dict(self.samples)
 
 
 @dataclass(repr=False)
