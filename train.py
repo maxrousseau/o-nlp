@@ -1336,16 +1336,11 @@ class EvaluateBERT(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
-        print(
-            "\n{} \nEvaluation results \nmodel : {} \n > F1 = {} \n > EM = {} \n{}".format(
-                "*" * 50, self.name, f1_score, em, "*" * 50
-            )
-        )
-
-        return f1_score, em
 
         if return_answers:
             return predicted_answers
+
+        return f1_score, em
 
 
 class EvaluateBART(BaseTester):
