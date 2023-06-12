@@ -1382,7 +1382,7 @@ class EvaluateBART(BaseTester):
         self.logger.info("Test and validation dataloaders created")
 
     @torch.no_grad()
-    def __call__(self):
+    def __call__(self, return_answers=False):
         self.get_dataloaders()
 
         accelerator = Accelerator(mixed_precision="fp16")
@@ -1419,6 +1419,9 @@ class EvaluateBART(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
+
+        if return_answers:
+            return predictions
 
 
 class EvaluateT5(BaseTester):
@@ -1460,7 +1463,7 @@ class EvaluateT5(BaseTester):
         self.logger.info("Test and validation dataloaders created")
 
     @torch.no_grad()
-    def __call__(self):
+    def __call__(self, return_answers=False):
         self.get_dataloaders()
         accelerator = Accelerator(mixed_precision="bf16")
         (
@@ -1496,6 +1499,8 @@ class EvaluateT5(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
+        if return_answers:
+            return predictions
 
 
 class Setfit(SetFitTrainer):
