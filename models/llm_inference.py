@@ -28,9 +28,8 @@ short term goal:
 
 class Prompt:
     def __init__(self, fmt, dataset):
-        self.fmt = fmt  # ICL, QA, Instruc
-        self.dataset = dataset
-        self.samples = {"answer": [], "prompt": []}
+        None
+
 
     def _t0(self, example):
         """
@@ -68,19 +67,69 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         return Dataset.from_dict(self.samples)
 
 
-@dataclass(repr=False)
 class GpuInference:
-    """initialize and run GPU inference"""
+    """initialize and run GPU inference
 
-    model_checkpoint: str = None
-    tokenizer_checkpoint: str = None
-    int8: bool = True
-    num_samples: int = 12
-    # options: T0pp, UnifiedQAv2 or FLAN for the T5 like models
-    # otherwise -> GPT2-XL, GPT-J, LLaMa, MPT, etc.
 
-    # @HERE :: start with unifiedqav2-large (int8 inference, should be enough if a good generation strategy is chosen,
-    # then scale up as needed).
+    takes a dataset as input, transforms it into a set of prompts, perform inference with the given strategy and returns
+    the input dataset with the generated results
+
+
+    """
+    def __init__(self,
+                 model_checkpoint=None,
+                 tokenizer_checkpoint=None,
+                 dataset = None,
+                 int8 = True,
+                 num_samples=4,
+                 prompt_fmt="uniqa"):
+
+    	self.model_checkpoint = model_checkpoint
+    	self.tokenizer_checkpoint = tokenizer_checkpoint
+    	self.int8 = int8
+    	self.num_samples = num_samples
+
+    	self.prompt_fmt = prompt_fmt  # ICL, QA, Instruc
+    	self.dataset = dataset
+    	self.samples = {"answer": [], "prompt": []}
+
+
+    	# options: T0pp, UnifiedQAv2 or FLAN for the T5 like models
+    	# otherwise -> GPT2-XL, GPT-J, LLaMa, MPT, etc.
+
+    	# @HERE :: start with unifiedqav2-large (int8 inference, should be enough if a good generation strategy is chosen,
+    	# then scale up as needed).
+
+    def _t0(self, example):
+        """
+        https://github.com/bigscience-workshop/promptsource/blob/main/promptsource/templates/squad/templates.yaml"""
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(
+            f"""
+Refer to the passage below and answer the following question:\n\nPassage: {context}\n\nQuestion: {question}
+        """
+        )
+
+    def _uniqa(self, example):
+        """ """
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(f"{question}\n{context}")
+
+    def _flan(self, example):
+        """ """
+        question = example["question"]
+        context = example["context"]
+        self.samples["answer"].append(example["answers"]["text"][0])
+        self.samples["prompt"].append(
+            f"Read this and answer the question.\n\n{context}\n\n{question}"
+        )
+
+
+
 
     def __get_models(self):
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_checkpoint)
@@ -93,14 +142,61 @@ class GpuInference:
             torch_dtype=torch.bfloat16,
         )
 
+    def __tokenize(self, examples, padding='max_length', max_ans_length=64, max_seq_length=512):
+        """preprocess vaildation for mask infilling QA"""
+
+        # @TODO :: look at fsbart paper for the t5 preprocessing...
+        source, target = examples["prompt"], examples["answer"]
+        source_tokenized = self.tokenizer(
+            source,
+            padding=padding,
+            max_length=max_seq_length,
+            truncation=True,
+        )
+
+        batch = {k: v for k, v in source_tokenized.items()}
+
+        target_tokenized = tokenizer(
+            target,
+            padding=padding,
+            max_length=max_ans_length,
+            truncation=False,
+        )
+
+        # Ignore padding in the loss
+        batch["labels"] = [
+            [-100 if token == self.tokenizer.pad_token_id else token for token in l]
+            for l in target_tokenized["input_ids"]
+        ]
+
+        batch["example_id"] = examples["id"]
+
+        return batch
+
     def __get_dataloader(self):
         """simple dataloader for each sample"""
+
         return None
 
     def __compute_f1(self, sampled_outputs, answer):
         """get the F1 per generated batch for a given example"""
 
+
+    def get_prompts(self):
+        ''' '''
+        for e in self.dataset:
+            eval("self._" + self.prompt_fmt + "(e)")
+
+        return Dataset.from_dict(self.samples)
+
+
     @torch.no_grad()
-    def genseq(self):
+    def genseq(self, prompts):
         """generate sequences per batch"""
-        return None
+        # __tokenize
+        # __get_DataLoader
+        # __run()
+
+        seqs = None
+
+        return seqs
