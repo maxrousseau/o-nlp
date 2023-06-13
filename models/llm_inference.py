@@ -165,17 +165,16 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         """generate sequences per batch"""
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_checkpoint)
-        # self.model = AutoModelForSeq2SeqLM.from_pretrained(
-        #     self.model_checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16, load_in_4bit=True, device_map='auto'
-        # ) # @TODO uncomment
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_checkpoint)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(
+            self.model_checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16, load_in_4bit=True, device_map='auto'
+        )
 
         tokenized_dataset = prompts.map(
             lambda example: self.__tokenize(
                 example,
                 tokenizer=self.tokenizer,
                 padding="max_length",
-                max_seq_length=512, # @TODO change
+                max_seq_length=1024,
             ),
             batched=True,
             remove_columns=prompts.column_names,
