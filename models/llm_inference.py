@@ -17,6 +17,7 @@ from accelerate import init_empty_weights
 import torch
 from torch.utils.data import DataLoader
 
+
 # https://huggingface.co/spaces/evaluate-metric/f1 just implement a simple evaluate metric
 """
 short term goal:
@@ -142,13 +143,15 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             input_tensor,
             shuffle=False,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=1,
         )
 
         return dataloader
 
     def __compute_f1(self, sampled_outputs, answer):
         """get the F1 per generated batch for a given example"""
+
+
 
     def get_prompts(self):
         """ """
@@ -162,16 +165,17 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         """generate sequences per batch"""
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_checkpoint)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.model_checkpoint, torch_dtype=torch.bfloat16
-        )
+        # self.model = AutoModelForSeq2SeqLM.from_pretrained(
+        #     self.model_checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16, load_in_4bit=True, device_map='auto'
+        # ) # @TODO uncomment
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_checkpoint)
 
         tokenized_dataset = prompts.map(
             lambda example: self.__tokenize(
                 example,
                 tokenizer=self.tokenizer,
                 padding="max_length",
-                max_seq_length=1024,
+                max_seq_length=512, # @TODO change
             ),
             batched=True,
             remove_columns=prompts.column_names,
@@ -182,7 +186,14 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             tokenized_dataset, tokenizer=self.tokenizer, model=self.model
         )
 
-        return dataloader
+        seqs = []
+
+        for steps, batch in enumerate(tqdm(dataloader)):
+            outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=20, no_repeat_ngram_size=2, num_return_sequences=5,
+                                early_stopping=True)
+            seqs.append(outputs)
+
+        return seqs
 
         # __run()
 
