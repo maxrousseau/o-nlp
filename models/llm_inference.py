@@ -130,7 +130,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         input_tensor = input_data.remove_columns(["example_id"])
         input_tensor.set_format("torch")
-        input_tensor.to(device)
         # create the dataloaders
 
         label_pad_token_id = -100
@@ -190,9 +189,9 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         seqs = []
 
 
+        accelerator = Accelerator()
+        (self.model, dataloader) = accelerator.prepare(self.model, dataloader)
 
-
-        self.model.to(device)
         self.model.eval()
         for steps, batch in enumerate(tqdm(dataloader)):
             outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=20, no_repeat_ngram_size=2, num_return_sequences=5,
