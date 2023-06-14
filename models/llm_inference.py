@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSe
 import datasets
 from datasets import Dataset, load_dataset
 
-from accelerate import init_empty_weights
+from accelerate import init_empty_weights, Accelerator
 
 import torch
 from torch.utils.data import DataLoader
