@@ -152,8 +152,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
     def __compute_f1(self, sampled_outputs, answer):
         """get the F1 per generated batch for a given example"""
 
-
-
     def get_prompts(self):
         """ """
         for e in self.dataset:
@@ -167,7 +165,11 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_checkpoint)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.model_checkpoint, low_cpu_mem_usage=True, torch_dtype=torch.bfloat16, load_in_8bit=True, device_map='auto'
+            self.model_checkpoint,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,
+            load_in_8bit=True,
+            device_map="auto",
         )
 
         tokenized_dataset = prompts.map(
@@ -188,14 +190,19 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         seqs = []
 
-
         accelerator = Accelerator()
         (self.model, dataloader) = accelerator.prepare(self.model, dataloader)
 
         self.model.eval()
         for steps, batch in enumerate(tqdm(dataloader)):
-            outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=5, no_repeat_ngram_size=2, num_return_sequences=5,
-                                          early_stopping=False)
+            outputs = self.model.generate(
+                **batch,
+                max_new_tokens=64,
+                do_sample=True,
+                top_k=50,
+                top_p=0.95,
+                num_return_sequences=5,
+            )
             seqs.append(outputs)
 
         return seqs
