@@ -176,7 +176,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 example,
                 tokenizer=self.tokenizer,
                 padding="max_length",
-                max_seq_length=1024,
+                max_seq_length=512,
             ),
             batched=True,
             remove_columns=prompts.column_names,
