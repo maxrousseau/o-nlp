@@ -51,6 +51,7 @@ class GpuInference:
         self.tokenizer_checkpoint = tokenizer_checkpoint
         self.int8 = int8
         self.num_samples = num_samples
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.prompt_fmt = prompt_fmt  # ICL, QA, Instruc
         self.dataset = dataset
@@ -129,6 +130,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         input_tensor = input_data.remove_columns(["example_id"])
         input_tensor.set_format("torch")
+        input_tensor.to(device)
         # create the dataloaders
 
         label_pad_token_id = -100
@@ -187,6 +189,11 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         seqs = []
 
+
+
+
+        self.model.to(device)
+        self.model.eval()
         for steps, batch in enumerate(tqdm(dataloader)):
             outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=20, no_repeat_ngram_size=2, num_return_sequences=5,
                                 early_stopping=True)
