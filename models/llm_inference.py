@@ -194,8 +194,8 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         self.model.eval()
         for steps, batch in enumerate(tqdm(dataloader)):
-            outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=20, no_repeat_ngram_size=2, num_return_sequences=5,
-                                early_stopping=True)
+            outputs = self.model.generate(**batch, max_new_tokens=64, num_beams=5, no_repeat_ngram_size=2, num_return_sequences=5,
+                                          early_stopping=False)
             seqs.append(outputs)
 
         return seqs
