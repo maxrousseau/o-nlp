@@ -200,8 +200,8 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 max_new_tokens=128,
                 do_sample=True,
                 top_k=50,
-                top_p=0.9,
-                num_return_sequences=5,
+                top_p=0.8,
+                num_return_sequences=8,
             )
             seqs.append(outputs)
 
