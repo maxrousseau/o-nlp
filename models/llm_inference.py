@@ -234,9 +234,10 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 **batch,
                 max_new_tokens=128,
                 do_sample=True,
-                top_k=50,
+                top_k=64,
                 top_p=0.95,
-                num_return_sequences=16,
+                num_return_sequences=64,
+                seed=0
             )
 
             seq_outputs.append(outputs)
