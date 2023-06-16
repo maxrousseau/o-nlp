@@ -163,7 +163,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         return Dataset.from_dict(self.samples)
 
-    def normalize_answer(self, s):
+    def __normalize_answer(self, s):
         """Lower text and remove punctuation, articles and extra whitespace."""
 
         def remove_articles(text):
