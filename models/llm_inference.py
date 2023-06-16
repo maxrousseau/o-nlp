@@ -27,7 +27,10 @@ from collections import Counter
 short term goal:
 1. implement t5 int8 inference (dataloader, prompt formating, f1)
 2. find a good generation strategy
-3. figure out maximum F1 on the training set for n=5, 10, 20 with unifiedqav2-large (If close to 100%, move to next step)
+3. figure out maximum F1 on the training set for n=5, 10, 20 with unifiedqav2-large (If close to 100%, move to next
+step) (88 with large, need to test with bigger models 3b, 11b and 20b)
+
+
 """
 
 
@@ -115,6 +118,14 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             low_cpu_mem_usage=True,
             torch_dtype=torch.bfloat16,
         )
+
+    def __dedup(self, predictions):
+        '''eliminate duplicate/non-unique answers'''
+        return None
+
+    def __cluser(self, predictions, threshold):
+        '''group answers into similarity clusters using levenstein distance set at a particular threshold'''
+        return None
 
     def __tokenize(
         self, examples, tokenizer=None, padding="max_length", max_seq_length=512
@@ -259,10 +270,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             seqs["predictions"].append(list(zip(predictions, scores)))
 
 
+        # @TODO :: implement base cleanup and clustering method (see above)
+
         return seqs
-
-        # __run()
-
-        # seqs = None
-
-        # return seqs
