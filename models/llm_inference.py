@@ -159,6 +159,18 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         return Dataset.from_dict(self.samples)
 
+    def f1_score(self, prediction, ground_truth):
+        prediction_tokens = normalize_answer(prediction).split()
+        ground_truth_tokens = normalize_answer(ground_truth).split()
+        common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+        num_same = sum(common.values())
+        if num_same == 0:
+            return 0
+        precision = 1.0 * num_same / len(prediction_tokens)
+        recall = 1.0 * num_same / len(ground_truth_tokens)
+        f1 = (2 * precision * recall) / (precision + recall)
+        return f1
+
     @torch.no_grad()
     def genseq(self, prompts):
         """generate sequences per batch"""
@@ -188,7 +200,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             tokenized_dataset, tokenizer=self.tokenizer, model=self.model
         )
 
-        seqs = []
+        seq_outputs = []
 
         accelerator = Accelerator()
         (self.model, dataloader) = accelerator.prepare(self.model, dataloader)
@@ -203,7 +215,20 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 top_p=0.95,
                 num_return_sequences=8,
             )
-            seqs.append(outputs)
+
+            seq_outputs.append(outputs)
+
+        seqs = {"answer" : [], "predictions" : []}
+
+        for i, s in enumerate(seq_outputs):
+            answer = self.prompt_fmt["answer"][i]
+            predictions = [self.tokenizer.decode(x, skip_special_tokens=True) for x in s]
+            scores = []
+            for p in predictions:
+                scores.append(self.f1_score(p, answer))
+            seqs["answer"].append(answer)
+            seqs["predictions"].append(list(zip(predictions, scores)))
+
 
         return seqs
 
