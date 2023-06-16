@@ -236,7 +236,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 do_sample=True,
                 top_k=50,
                 top_p=0.95,
-                num_return_sequences=8,
+                num_return_sequences=16,
             )
 
             seq_outputs.append(outputs)
