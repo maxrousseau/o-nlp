@@ -221,7 +221,8 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         seqs = {"answer" : [], "predictions" : []}
 
         for i in range(len(seq_outputs)):
-            answer = self.prompt_fmt["answer"][i]
+            print(i)
+            answer = self.samples["answer"][i]
             predictions = [self.tokenizer.decode(x, skip_special_tokens=True) for x in seq_outputs[i]]
             scores = []
             for p in predictions:
