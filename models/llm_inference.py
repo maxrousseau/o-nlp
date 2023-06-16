@@ -203,7 +203,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             self.model_checkpoint,
             low_cpu_mem_usage=True,
             torch_dtype=torch.bfloat16,
-            load_in_8bit=True,
+            load_in_4bit=True,
             device_map="auto",
         )
 
@@ -244,7 +244,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         seqs = {"answer" : [], "predictions" : []}
 
         for i in range(len(seq_outputs)):
-            print(i)
             answer = self.samples["answer"][i]
             predictions = [self.tokenizer.decode(x, skip_special_tokens=True) for x in seq_outputs[i]]
             scores = []
