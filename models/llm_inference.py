@@ -235,7 +235,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
                 max_new_tokens=128,
                 do_sample=True,
                 top_p=0.95,
-                num_return_sequences=32,
+                num_return_sequences=8,
             )
 
             seq_outputs.append(outputs)
