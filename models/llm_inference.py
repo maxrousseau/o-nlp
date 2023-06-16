@@ -60,12 +60,19 @@ class GpuInference:
         self.prompt_fmt = prompt_fmt  # ICL, QA, Instruc
         self.dataset = dataset
         self.samples = {"answer": [], "prompt": [], "id": []}
+        self.seed = 0
 
         # options: T0pp, UnifiedQAv2 or FLAN for the T5 like models
         # otherwise -> GPT2-XL, GPT-J, LLaMa, MPT, etc.
 
         # @HERE :: start with unifiedqav2-large (int8 inference, should be enough if a good generation strategy is chosen,
         # then scale up as needed).
+
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
+        torch.cuda.manual_seed(self.seed)
 
     def _t0(self, example):
         """
