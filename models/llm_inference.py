@@ -203,7 +203,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             self.model_checkpoint,
             low_cpu_mem_usage=True,
             torch_dtype=torch.bfloat16,
-            load_in_4bit=True,
+            load_in_8bit=True,
             device_map="auto",
         )
 
