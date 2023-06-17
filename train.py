@@ -171,7 +171,7 @@ class FinetuneT5(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=self.train_batch_size,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -180,7 +180,7 @@ class FinetuneT5(BaseTrainer):
             val_tensor,
             shuffle=False,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=self.val_batch_size,
         )
 
         self.logger.info("Training, validation and test dataloaders created")
@@ -1458,7 +1458,7 @@ class EvaluateT5(BaseTester):
         self.test_dataloader = DataLoader(
             test_tensor,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=self.val_batch_size,
             shuffle=False,
         )
 
