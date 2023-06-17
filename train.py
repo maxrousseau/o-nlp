@@ -269,11 +269,13 @@ class FinetuneT5(BaseTrainer):
 
                 outputs = self.model(**batch)
                 loss = outputs.loss
-                losses["train"].append(loss.detach().cpu().numpy())
+
                 if torch.device != "cpu":
                     accelerator.backward(loss)
                 else:
                     loss.backward()
+
+                losses["train"].append(loss.detach().float().cpu().numpy())
 
                 optimizer.step()
                 if self.lr_scheduler:
