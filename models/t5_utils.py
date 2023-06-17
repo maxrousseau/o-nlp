@@ -62,6 +62,7 @@ class T5CFG:
     checkpoint_step: int = None
 
     train_dataset: Dataset = None
+    val_dataset: Dataset = None
     test_dataset: Dataset = None
 
     val_batches: Any = None
