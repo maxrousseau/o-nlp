@@ -19,7 +19,7 @@ from transformers import (
 
 from load_data import load_mini_oqa, t5_format_mi, denoising_format, load_tgt
 
-from datasets import Dataset, load_metric
+from datasets import Dataset, load_metric, load_dataset
 import datasets
 
 datasets.utils.logging.set_verbosity_warning
@@ -422,7 +422,7 @@ def setup_finetune_t5(dataset_repo, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
 
-    oqa = load_data(dataset_repo)
+    oqa = load_dataset(dataset_repo)
     config.train_dataset = oqa["train"]
     config.val_dataset = oqa["validation"]
 
@@ -456,7 +456,7 @@ def setup_finetune_t5(dataset_repo, config):
 def setup_evaluate_t5(dataset_repo, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
-    oqa = load_data(dataset_repo)
+    oqa = load_dataset(dataset_repo)
     config.test_dataset = oqa["test"]
 
     logger.info("Test dataset loaded from disk and formatted to mask-filling")
