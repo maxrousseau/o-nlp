@@ -20,9 +20,9 @@ from transformers import (
 
 from accelerate import Accelerator
 
-from sentence_transformers.losses import CosineSimilarityLoss
+# from sentence_transformers.losses import CosineSimilarityLoss
 
-from setfit import SetFitTrainer
+# from setfit import SetFitTrainer
 
 import torch
 import torch.nn as nn
@@ -1505,46 +1505,46 @@ class EvaluateT5(BaseTester):
             return predictions
 
 
-class Setfit(SetFitTrainer):
-    """ """
+# class Setfit(SetFitTrainer):
+#     """ """
 
-    def __init__(self, config):
-        super().__init__(
-            model=config.model,
-            train_dataset=config.train_dataset,
-            eval_dataset=config.val_dataset,
-            loss_class=CosineSimilarityLoss,
-            metric="accuracy",
-            batch_size=12,
-            learning_rate=config.lr,
-            num_iterations=20,
-            num_epochs=config.n_epochs,
-            seed=config.seed,
-        )
-        self.checkpoint_savedir = config.checkpoint_savedir
-        self.max_length = config.max_length
-        self.name = config.name
+#     def __init__(self, config):
+#         super().__init__(
+#             model=config.model,
+#             train_dataset=config.train_dataset,
+#             eval_dataset=config.val_dataset,
+#             loss_class=CosineSimilarityLoss,
+#             metric="accuracy",
+#             batch_size=12,
+#             learning_rate=config.lr,
+#             num_iterations=20,
+#             num_epochs=config.n_epochs,
+#             seed=config.seed,
+#         )
+#         self.checkpoint_savedir = config.checkpoint_savedir
+#         self.max_length = config.max_length
+#         self.name = config.name
 
-        FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
-        logging.basicConfig(format=FORMAT)
-        self.logger = logging.getLogger("trainer")
-        self.logger.setLevel(logging.DEBUG)  # change level if debug or not
+#         FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
+#         logging.basicConfig(format=FORMAT)
+#         self.logger = logging.getLogger("trainer")
+#         self.logger.setLevel(logging.DEBUG)  # change level if debug or not
 
-    def save_model(self, path):
-        """basic model saving where the path is overwrote if"""
-        if os.path.isfile(path):
-            shutil.rmtree(path)
-        self.model._save_pretrained(save_directory=path)
+#     def save_model(self, path):
+#         """basic model saving where the path is overwrote if"""
+#         if os.path.isfile(path):
+#             shutil.rmtree(path)
+#         self.model._save_pretrained(save_directory=path)
 
-    def __call__(self):
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
-        save_path = os.path.abspath(
-            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
+#     def __call__(self):
+#         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
+#         save_path = os.path.abspath(
+#             "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
+#         )
 
-        self.train(max_length=self.max_length)
-        metrics = self.evaluate()
-        self.save_model(save_path)
-        self.logger.info(
-            "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
-        )
+#         self.train(max_length=self.max_length)
+#         metrics = self.evaluate()
+#         self.save_model(save_path)
+#         self.logger.info(
+#             "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
+#         )
