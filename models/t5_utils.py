@@ -423,8 +423,8 @@ def setup_finetune_t5(dataset_repo, config):
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
 
     oqa = load_dataset(dataset_repo)
-    config.train_dataset = oqa["train"]
-    config.val_dataset = oqa["validation"]
+    config.train_dataset = t5_format_mi(oqa["train"])
+    config.val_dataset = t5_format_mi(oqa["validation"])
 
     logger.info("Masked QA datasets loaded")
 
@@ -457,7 +457,7 @@ def setup_evaluate_t5(dataset_repo, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
     oqa = load_dataset(dataset_repo)
-    config.test_dataset = oqa["test"]
+    config.test_dataset = t5_format_mi(oqa["test"])
 
     logger.info("Test dataset loaded from disk and formatted to mask-filling")
 
