@@ -302,6 +302,7 @@ class FinetuneT5(BaseTrainer):
                 self.logger.info("new best model saved!")
 
         self.logger.info("Best model f1 = {}".format(best_f1))
+        return save_path
 
 
 class TaskDistillationBERT(BaseTrainer):
@@ -1460,7 +1461,7 @@ class EvaluateT5(BaseTester):
         self.test_dataloader = DataLoader(
             test_tensor,
             collate_fn=data_collator,
-            batch_size=self.val_batch_size,
+            batch_size=4,
             shuffle=False,
         )
 
