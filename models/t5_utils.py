@@ -418,13 +418,15 @@ def evaluate_pretraining(outputs, target_answers):
     return m, predicted_answers, theoretical_answers
 
 
-def setup_finetune_t5(train_path, val_path, config):
+def setup_finetune_t5(dataset_repo, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
-    config.train_dataset = t5_format_mi(Dataset.load_from_disk(train_path))
-    config.val_dataset = t5_format_mi(Dataset.load_from_disk(val_path))
 
-    logger.info("Masked QA datasets loaded from file")
+    oqa = load_data(dataset_repo)
+    config.train_dataset = oqa["train"]
+    config.val_dataset = oqa["validation"]
+
+    logger.info("Masked QA datasets loaded")
 
     config.model, config.tokenizer = t5_init(
         config.model_checkpoint, config.tokenizer_checkpoint
@@ -451,10 +453,11 @@ def setup_finetune_t5(train_path, val_path, config):
     return config
 
 
-def setup_evaluate_t5(test_path, config):
+def setup_evaluate_t5(dataset_repo, config):
     """call t5 setup from config, return everything that is necessary for fine-tuning"""
     # @HERE :: fix dataset loading and preprocessing to remove the __get_val_answers() method from FinetuneT5
-    config.test_dataset = t5_format_mi(Dataset.load_from_disk(test_path))
+    oqa = load_data(dataset_repo)
+    config.test_dataset = oqa["test"]
 
     logger.info("Test dataset loaded from disk and formatted to mask-filling")
 
