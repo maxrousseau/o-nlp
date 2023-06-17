@@ -522,7 +522,7 @@ def setup_taskdistil_oqa(train_path, val_path, config, tacoma=False):
     return config
 
 
-def setup_finetuning_oqa(train_path, val_path, config):
+def setup_finetuning_oqa(data_repo, config):
     """
         Setup function for fine-tuning BERT-like models on OQA-v1.0
 
@@ -530,10 +530,11 @@ def setup_finetuning_oqa(train_path, val_path, config):
     object which contains everything needed to instantiate a trainer and run.
     """
 
-    config.train_dataset = Dataset.load_from_disk(train_path)
-    config.val_dataset = Dataset.load_from_disk(val_path)
+    oqa = load_dataset(data_repo)
+    config.train_dataset = oqa["train"]
+    config.val_dataset = oqa["val"]
 
-    logger.info("datasets loaded from disk")
+    logger.info("datasets loaded")
 
     config.model, config.tokenizer = bert_init(
         config.model_checkpoint, config.tokenizer_checkpoint
@@ -655,11 +656,12 @@ def setup_pretrain_bert(train_path, config):
     return config
 
 
-def setup_evaluate_oqa(test_path, config):
+def setup_evaluate_oqa(data_repo, config):
     """ """
-    config.test_dataset = Dataset.load_from_disk(test_path)
+    oqa = load_dataset(data_repo)
+    config.test_dataset = oqa["test"]
 
-    logger.info("datasets loaded from disk")
+    logger.info("test dataset loaded")
 
     config.model, config.tokenizer = bert_init(
         config.model_checkpoint, config.tokenizer_checkpoint

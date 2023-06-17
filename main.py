@@ -51,8 +51,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         t5_config = t5_utils.setup_finetune_t5(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             t5_config,
         )
         print(t5_config)
@@ -69,7 +68,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         t5_config = t5_utils.setup_evaluate_t5(
-            dataset_config["test_dataset_path"], t5_config
+            dataset_config["repository"], t5_config
         )
         # @HERE :: make sure setup function is good, then finish training loop
         print(t5_config)
@@ -90,8 +89,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         bart_config = bart_utils.setup_finetune_bart(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             bart_config,
         )
         # @HERE :: make sure setup function is good, then finish training loop
@@ -109,7 +107,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         bart_config = bart_utils.setup_evaluate_bart(
-            dataset_config["test_dataset_path"], bart_config
+            dataset_config["repository"], bart_config
         )
         # @HERE :: make sure setup function is good, then finish training loop
         print(bart_config)
@@ -129,7 +127,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         bert_config = bert_utils.setup_pretrain_bert(
-            dataset_config["train_dataset_path"], bert_config
+            dataset_config["repository"], bert_config
         )
         print(bert_config)
         tuner = PretrainBERT(bert_config)
@@ -150,8 +148,7 @@ def main():
             append_special_token=tokenizer_config["append_special_tokens"],
         )
         bert_config = bert_utils.setup_finetuning_oqa(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             bert_config,
         )
         print(bert_config)
@@ -179,8 +176,7 @@ def main():
             val_batch_size=hyperparameter_config["validation_batch_size"],
         )
         bert_config = bert_utils.setup_finetuning_oqa(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             bert_config,
         )
         print(bert_config)
@@ -200,7 +196,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         bert_config = bert_utils.setup_finetuning_squad(
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             bert_config,
         )
         print(bert_config)
@@ -216,7 +212,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         bert_config = bert_utils.setup_evaluate_oqa(
-            dataset_config["test_dataset_path"], bert_config
+            dataset_config["repository"], bert_config
         )
 
         print(bert_config)
@@ -240,7 +236,7 @@ def main():
             load_from_checkpoint=model_config["load_from_last_checkpoint"],
         )
         t5_config = t5_utils.setup_pretrain_t5(
-            dataset_config["train_dataset_path"], t5_config
+            dataset_config["repository"], t5_config
         )
         print(t5_config)
         pretrainer = PretrainT5(t5_config)
@@ -257,8 +253,7 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         setfit_config = setfit_utils.setup_setfit_training(
-            dataset_config["train_dataset_path"],
-            dataset_config["val_dataset_path"],
+            dataset_config["repository"],
             setfit_config,
         )
         trainer = Setfit(setfit_config)

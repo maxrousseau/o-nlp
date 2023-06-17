@@ -37,7 +37,7 @@ def load_from_json(fpath):
 
 
 # @TODO :: just go for (80, 20,) 20
-def split_by_topic(dataset, val_split=0.12, test_split=0.18):
+def split_by_topic(dataset, val_split=0.20, test_split=0.20):
     """ """
 
     topics = sorted(set(dataset["topic"]))
@@ -105,7 +105,7 @@ def longest_answer(dataset, tokenizer):
 def main():
 
     raw_json_path = (
-        "C:/Users/roum5/source/data/oqa/oqa-v1.0-fullset/oqa-v1.0-26feb2023.json"
+        "/Users/mrousseau/code/data/oqa-v1.0-26feb2023.json"
     )
     dump_path = "./tmp/oqa_shuffled_split"
 

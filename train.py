@@ -1102,18 +1102,20 @@ class FinetuneBERT(BaseTrainer):
                 }
             )
 
-            # checkpointing (only best_val)
-            if val_loss < lowest_val_loss:
+            # checkpointing (best val f1)
+            if f1_score > best_f1:
                 self.save_model(save_path)
-                lowest_val_loss = val_loss
+                # lowest_val_loss = val_loss
                 best_f1 = f1_score
                 self.logger.info(
-                    "New save with f1 = {} at lowest val loss".format(best_f1)
+                    "New save with f1 = {}".format(best_f1)
                 )
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )
+
+        return save_path
 
 
 class FinetuneBART(BaseTrainer):
