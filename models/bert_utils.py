@@ -532,7 +532,7 @@ def setup_finetuning_oqa(data_repo, config):
 
     oqa = load_dataset(data_repo)
     config.train_dataset = oqa["train"]
-    config.val_dataset = oqa["val"]
+    config.val_dataset = oqa["validation"]
 
     logger.info("datasets loaded")
 
