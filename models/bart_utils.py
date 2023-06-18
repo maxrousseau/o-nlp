@@ -21,8 +21,8 @@ from transformers import (
     BartForConditionalGeneration,
 )
 
-from datasets import Dataset
-import datasets
+from datasets import Dataset, load_dataset
+from datasets import utils as dutils
 
 import pyarrow as pa
 
@@ -30,7 +30,7 @@ import evaluate
 
 metric = evaluate.load("squad")
 
-datasets.utils.logging.set_verbosity_warning
+dutils.logging.set_verbosity_warning
 
 FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
 logging.basicConfig(format=FORMAT)
@@ -56,6 +56,9 @@ class BARTCFG:
     load_from_checkpoint: bool = False
     checkpoint_state: str = None
     checkpoint_step: int = None
+
+    train_batch_size: int = 4
+    val_batch_size: int = 16
 
     train_dataset: Dataset = None
     val_dataset: Dataset = None
@@ -100,7 +103,7 @@ BART model configuration
 def bart_init(model_checkpoint, tokenizer_checkpoint):
     """ """
     model = BartForConditionalGeneration.from_pretrained(model_checkpoint)
-    tokenizer = BartTokenizerFast.from_pretrained(tokenizer_checkpoint)
+    tokenizer = BartTokenizerFast.from_pretrained(tokenizer_checkpoint, torch_dtype=torch.float16)
 
     return model, tokenizer
 
@@ -282,12 +285,13 @@ def evaluate(eval_outputs, answers):
     return m, predicted_answers, theoretical_answers
 
 
-def setup_finetune_bart(train_path, val_path, config):
+def setup_finetune_bart(dataset_repo, config):
     """"""
-    config.train_dataset = bart_format_mi(Dataset.load_from_disk(train_path))
-    config.val_dataset = bart_format_mi(Dataset.load_from_disk(val_path))
+    oqa = load_data(dataset_repo)
+    config.train_dataset = bart_format_mi(oqa["train"])
+    config.val_dataset = bart_format_mi(oqa["validation"])
 
-    logger.info("Training and validation datasets loaded from disk")
+    logger.info("Training and validation datasets loaded")
 
     config.model, config.tokenizer = bart_init(
         config.model_checkpoint, config.tokenizer_checkpoint
@@ -315,8 +319,9 @@ def setup_finetune_bart(train_path, val_path, config):
     return config
 
 
-def setup_evaluate_bart(test_path, config):
-    config.test_dataset = bart_format_mi(Dataset.load_from_disk(test_path))
+def setup_evaluate_bart(dataset_repo, config):
+    oqa = load_data(dataset_repo)
+    config.test_dataset = bart_format_mi(oqa["test"])
 
     logger.info("datasets loaded from disk")
 

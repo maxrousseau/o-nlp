@@ -104,9 +104,6 @@ T5 model configuration
         )
         return s
 
-    # TBD add a print/export function to the config when we save model...
-    # def __repr__() -> str
-
 
 def t5_format_mi(dataset):
     """take a squad-like qa dataset and transform into MLM format specified in the fewshotBART paper

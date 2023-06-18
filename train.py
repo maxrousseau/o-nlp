@@ -1132,7 +1132,7 @@ class FinetuneBART(BaseTrainer):
             train_tensor,
             shuffle=True,
             collate_fn=data_collator,
-            batch_size=8,
+            batch_size=self.train_batch_size,
             num_workers=0,
             worker_init_fn=self.seed_worker,
             generator=self.g,
@@ -1143,7 +1143,7 @@ class FinetuneBART(BaseTrainer):
         self.val_dataloader = DataLoader(
             val_tensor,
             collate_fn=data_collator,
-            batch_size=4,
+            batch_size=self.val_batch_size,
             shuffle=False,
         )
 
@@ -1254,7 +1254,8 @@ class FinetuneBART(BaseTrainer):
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
         )
-        # @HERE :: debug then setup wandb logging
+
+        return save_path
 
 
 class EvaluateBERT(BaseTester):
@@ -1413,6 +1414,8 @@ class EvaluateBART(BaseTester):
 
         if return_answers:
             return predictions
+
+        return f1_score, em
 
 
 class EvaluateT5(BaseTester):
