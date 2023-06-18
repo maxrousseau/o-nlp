@@ -10,7 +10,6 @@ from train import *
 
 from datasets import Dataset
 
-
 def main():
     """get args and call"""
     parser = argparse.ArgumentParser(

@@ -126,7 +126,7 @@ class BaseTrainer:
         self.test_dataloader = None
 
     def seed_worker(self, worker_id):
-        worker_seed = torch.initial_seed() % 2 ** 32
+        worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
@@ -266,7 +266,6 @@ class FinetuneT5(BaseTrainer):
         for epoch in range(self.num_epochs):
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
-
                 outputs = self.model(**batch)
                 loss = outputs.loss
 
@@ -362,26 +361,19 @@ class TaskDistillationBERT(BaseTrainer):
         teacher_start_logits,
         teacher_end_logits,
     ):
-
         assert student_start_logits.size() == teacher_start_logits.size()
         assert student_end_logits.size() == teacher_end_logits.size()
 
         # NOTE :: idk why the log_softmax for the student?...
-        start_loss = (
-            self.KD_loss(
-                input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
-                target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
-            )
-            * (self.temperature ** 2)
-        )
+        start_loss = self.KD_loss(
+            input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+        ) * (self.temperature**2)
 
-        end_loss = (
-            self.KD_loss(
-                input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
-                target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
-            )
-            * (self.temperature ** 2)
-        )
+        end_loss = self.KD_loss(
+            input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+        ) * (self.temperature**2)
 
         loss_ce = (start_loss + end_loss) / 2.0
         print(loss_ce)
@@ -391,7 +383,6 @@ class TaskDistillationBERT(BaseTrainer):
         return total_loss
 
     def get_dataloaders(self):
-
         """"""
         train_tensor = self.train_batches.remove_columns(
             ["example_id", "offset_mapping"]
@@ -721,7 +712,6 @@ class PretrainT5(BaseTrainer):
         self.model.train()
         for epoch in range(self.num_epochs):
             for steps, batch in enumerate(self.train_dataloader):
-
                 flabels = batch["labels"].flatten().cpu()
                 n_masked_tokens += len(flabels[flabels >= 0]) - 2
                 # logger.info(
@@ -1000,7 +990,6 @@ class FinetuneBERT(BaseTrainer):
         return f1_score, val_loss
 
     def __get_dataloaders(self):
-
         """"""
         train_tensor = self.train_batches.remove_columns(
             ["example_id", "offset_mapping"]
@@ -1028,7 +1017,6 @@ class FinetuneBERT(BaseTrainer):
         self.logger.info("Training and validation dataloaders created")
 
     def __call__(self):
-
         # dataloaders
         self.__get_dataloaders()
         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
@@ -1110,9 +1098,7 @@ class FinetuneBERT(BaseTrainer):
                 self.save_model(save_path)
                 # lowest_val_loss = val_loss
                 best_f1 = f1_score
-                self.logger.info(
-                    "New save with f1 = {}".format(best_f1)
-                )
+                self.logger.info("New save with f1 = {}".format(best_f1))
 
         self.logger.info(
             "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
@@ -1506,6 +1492,8 @@ class EvaluateT5(BaseTester):
         )
         if return_answers:
             return predictions
+
+        return f1_score, em
 
 
 # class Setfit(SetFitTrainer):

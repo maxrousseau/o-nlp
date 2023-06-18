@@ -33,7 +33,6 @@ step) (88 with large, need to test with bigger models 3b, 11b and 20b)
 
 """
 
-
 class GpuInference:
     """initialize and run GPU inference
 
@@ -53,7 +52,6 @@ class GpuInference:
         num_samples=4,
         prompt_fmt="uniqa",
     ):
-
         self.model_checkpoint = model_checkpoint
         self.tokenizer_checkpoint = tokenizer_checkpoint
         self.int8 = int8
@@ -79,7 +77,8 @@ class GpuInference:
 
     def _t0(self, example):
         """
-        https://github.com/bigscience-workshop/promptsource/blob/main/promptsource/templates/squad/templates.yaml"""
+        https://github.com/bigscience-workshop/promptsource/blob/main/promptsource/templates/squad/templates.yaml
+        """
         question = example["question"]
         context = example["context"]
         self.samples["id"].append(example["id"])
@@ -120,11 +119,11 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
         )
 
     def __dedup(self, predictions):
-        '''eliminate duplicate/non-unique answers'''
+        """eliminate duplicate/non-unique answers"""
         return None
 
     def __cluser(self, predictions, threshold):
-        '''group answers into similarity clusters using levenstein distance set at a particular threshold'''
+        """group answers into similarity clusters using levenstein distance set at a particular threshold"""
         return None
 
     def __tokenize(
@@ -171,7 +170,7 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         return dataloader
 
-    def __compute_f1(self, sampled_outputs, answer):
+    def __compue_f1(self, sampled_outputs, answer):
         """get the F1 per generated batch for a given example"""
 
     def get_prompts(self):
@@ -198,7 +197,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
             return text.lower()
 
         return white_space_fix(remove_articles(remove_punc(lower(s))))
-
 
     def f1_score(self, prediction, ground_truth):
         prediction_tokens = self.__normalize_answer(prediction).split()
@@ -258,17 +256,19 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
             seq_outputs.append(outputs)
 
-        seqs = {"answer" : [], "predictions" : []}
+        seqs = {"answer": [], "predictions": []}
 
         for i in range(len(seq_outputs)):
             answer = self.samples["answer"][i]
-            predictions = [self.tokenizer.decode(x, skip_special_tokens=True) for x in seq_outputs[i]]
+            predictions = [
+                self.tokenizer.decode(x, skip_special_tokens=True)
+                for x in seq_outputs[i]
+            ]
             scores = []
             for p in predictions:
                 scores.append(self.f1_score(p, answer))
             seqs["answer"].append(answer)
             seqs["predictions"].append(list(zip(predictions, scores)))
-
 
         # @TODO :: implement base cleanup and clustering method (see above)
 
