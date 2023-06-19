@@ -1086,7 +1086,6 @@ class FinetuneBERT(BaseTrainer):
                 if self.lr_scheduler:
                     lr_scheduler.step()
                 optimizer.zero_grad()
-                print("optimizer")
 
                 progressbar.update(1)
             # eval
