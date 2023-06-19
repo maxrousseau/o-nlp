@@ -1074,17 +1074,12 @@ class FinetuneBERT(BaseTrainer):
 
         # training loop
         progressbar = tqdm(range(num_training_steps))
-        print("pre loop")
         for epoch in range(self.num_epochs):
-            print("epoch loop")
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
-                print("batch loop")
                 outputs = self.model(**batch)
-                print("outputs")
                 loss = outputs.loss
                 accelerator.backward(loss)
-                print("backprop")
                 losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
