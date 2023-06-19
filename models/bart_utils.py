@@ -103,7 +103,7 @@ BART model configuration
 def bart_init(model_checkpoint, tokenizer_checkpoint):
     """ """
     model = BartForConditionalGeneration.from_pretrained(model_checkpoint)
-    tokenizer = BartTokenizerFast.from_pretrained(tokenizer_checkpoint, torch_dtype=torch.float16)
+    tokenizer = BartTokenizerFast.from_pretrained(tokenizer_checkpoint)
 
     return model, tokenizer
 
