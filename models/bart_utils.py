@@ -21,8 +21,8 @@ from transformers import (
     BartForConditionalGeneration,
 )
 
+import datasets
 from datasets import Dataset, load_dataset
-from datasets import utils as dutils
 
 import pyarrow as pa
 
@@ -30,7 +30,7 @@ import evaluate
 
 metric = evaluate.load("squad")
 
-dutils.logging.set_verbosity_warning
+datasets.logging.set_verbosity_warning
 
 FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
 logging.basicConfig(format=FORMAT)
@@ -267,7 +267,7 @@ def prepare_inputs(
 def evaluate(eval_outputs, answers):
     theoretical_answers = []
     predicted_answers = []
-    __import__("datasets").disable_progress_bar()
+    datasets.disable_progress_bar()
 
     for idx, predicted_answer in eval_outputs:
         label_answer = answers.filter(lambda sample: sample["id"] == idx)[
@@ -290,7 +290,6 @@ def setup_finetune_bart(dataset_repo, config):
     oqa = load_dataset(dataset_repo)
     config.train_dataset = bart_format_mi(oqa["train"])
     config.val_dataset = bart_format_mi(oqa["validation"])
-
     logger.info("Training and validation datasets loaded")
 
     config.model, config.tokenizer = bart_init(

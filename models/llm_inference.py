@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 import collections
+import random
 
 import numpy as np
 
@@ -32,6 +33,7 @@ step) (88 with large, need to test with bigger models 3b, 11b and 20b)
 
 
 """
+
 
 class GpuInference:
     """initialize and run GPU inference
