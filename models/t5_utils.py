@@ -162,7 +162,7 @@ def t5_init(model_checkpoint, tokenizer_checkpoint):
     """initialize model and tokenizer, mode=Default, LoRA"""
 
     model = T5ForConditionalGeneration.from_pretrained(
-        model_checkpoint, torch_dtype=torch.bfloat16
+        model_checkpoint,  # torch_dtype=torch.bfloat16
     )
     tokenizer = T5Tokenizer.from_pretrained(tokenizer_checkpoint)
 
