@@ -288,7 +288,7 @@ def evaluate(eval_outputs, answers):
 def setup_finetune_bart(dataset_repo, config):
     """"""
     oqa = load_dataset(dataset_repo)
-    config.train_dataset = bart_format_mi(oqa["train"]
+    config.train_dataset = bart_format_mi(oqa["train"])
     config.val_dataset = bart_format_mi(oqa["validation"])
     logger.info("Training and validation datasets loaded")
 
