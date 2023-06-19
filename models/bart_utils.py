@@ -267,7 +267,7 @@ def prepare_inputs(
 def evaluate(eval_outputs, answers):
     theoretical_answers = []
     predicted_answers = []
-    datasets.disable_progress_bar()
+    __import__("datasets").disable_progress_bar()
 
     for idx, predicted_answer in eval_outputs:
         label_answer = answers.filter(lambda sample: sample["id"] == idx)[
