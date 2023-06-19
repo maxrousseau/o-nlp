@@ -126,7 +126,7 @@ class BaseTrainer:
         self.test_dataloader = None
 
     def seed_worker(self, worker_id):
-        worker_seed = torch.initial_seed() % 2**32
+        worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
@@ -365,15 +365,21 @@ class TaskDistillationBERT(BaseTrainer):
         assert student_end_logits.size() == teacher_end_logits.size()
 
         # NOTE :: idk why the log_softmax for the student?...
-        start_loss = self.KD_loss(
-            input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
-            target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
-        ) * (self.temperature**2)
+        start_loss = (
+            self.KD_loss(
+                input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
+                target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+            )
+            * (self.temperature ** 2)
+        )
 
-        end_loss = self.KD_loss(
-            input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
-            target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
-        ) * (self.temperature**2)
+        end_loss = (
+            self.KD_loss(
+                input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
+                target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+            )
+            * (self.temperature ** 2)
+        )
 
         loss_ce = (start_loss + end_loss) / 2.0
         print(loss_ce)
@@ -1068,18 +1074,25 @@ class FinetuneBERT(BaseTrainer):
 
         # training loop
         progressbar = tqdm(range(num_training_steps))
+        print("pre loop")
         for epoch in range(self.num_epochs):
+            print("epoch loop")
             self.model.train()
             for steps, batch in enumerate(self.train_dataloader):
+                print("batch loop")
                 outputs = self.model(**batch)
+                print("outputs")
                 loss = outputs.loss
                 accelerator.backward(loss)
+                print("backprop")
                 losses["train"].append(loss.detach().cpu().numpy())
 
                 optimizer.step()
                 if self.lr_scheduler:
                     lr_scheduler.step()
                 optimizer.zero_grad()
+                print("optimizer")
+
                 progressbar.update(1)
             # eval
             f1_score, val_loss = self.__eval(accelerator)
