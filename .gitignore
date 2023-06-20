@@ -5,6 +5,7 @@ onlp-env
 fops/
 *.json
 *.csv
+*.log
 tmp/
 wandb/
 ckpts/

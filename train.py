@@ -1294,7 +1294,7 @@ class EvaluateBERT(BaseTester):
         self.logger.info("Test dataloader created")
 
     @torch.no_grad()
-    def __call__(self, return_answers=False):
+    def __call__(self, return_answers=False, multiple_answers=False):
         # dataloader for test
         self.__get_dataloader()
 
@@ -1320,12 +1320,18 @@ class EvaluateBERT(BaseTester):
         end_logits = np.concatenate(end_logits)
         start_logits = start_logits[: len(self.test_batches)]
         end_logits = end_logits[: len(self.test_batches)]
-        metrics, predicted_answers, theoretical_answers = bert_utils.answer_from_logits(
+        (
+            metrics,
+            predicted_answers,
+            theoretical_answers,
+            sampled_answers,
+        ) = bert_utils.answer_from_logits(
             start_logits,
             end_logits,
             self.test_batches,
             self.test_dataset,
             self.tokenizer,
+            multiple_answers=multiple_answers,
         )
         f1_score = metrics["f1"]
         em = metrics["exact_match"]
@@ -1337,7 +1343,7 @@ class EvaluateBERT(BaseTester):
         )
 
         if return_answers:
-            return predicted_answers
+            return predicted_answers, sampled_answers
 
         return f1_score, em
 

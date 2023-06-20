@@ -10,6 +10,7 @@ from train import *
 
 from datasets import Dataset
 
+
 def main():
     """get args and call"""
     parser = argparse.ArgumentParser(
@@ -66,9 +67,7 @@ def main():
             max_ans_length=model_config["max_ans_len"],
             seed=hyperparameter_config["seed"],
         )
-        t5_config = t5_utils.setup_evaluate_t5(
-            dataset_config["repository"], t5_config
-        )
+        t5_config = t5_utils.setup_evaluate_t5(dataset_config["repository"], t5_config)
         # @HERE :: make sure setup function is good, then finish training loop
         print(t5_config)
         evaluator = EvaluateT5(t5_config)
@@ -234,9 +233,7 @@ def main():
             checkpoint_state=model_config["checkpoint_state"],
             load_from_checkpoint=model_config["load_from_last_checkpoint"],
         )
-        t5_config = t5_utils.setup_pretrain_t5(
-            dataset_config["repository"], t5_config
-        )
+        t5_config = t5_utils.setup_pretrain_t5(dataset_config["repository"], t5_config)
         print(t5_config)
         pretrainer = PretrainT5(t5_config)
         pretrainer()
