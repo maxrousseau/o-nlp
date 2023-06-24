@@ -172,9 +172,6 @@ Refer to the passage below and answer the following question:\n\nPassage: {conte
 
         return dataloader
 
-    def __compue_f1(self, sampled_outputs, answer):
-        """get the F1 per generated batch for a given example"""
-
     def get_prompts(self):
         """ """
         for e in self.dataset:

@@ -341,7 +341,7 @@ def answer_from_logits(
         example_to_features[feature["example_id"]].append(idx)
 
     predicted_answers = []
-    sampled_answers = []  # may be unused
+    sampled_answers = {"id": [], "samples": []}  # may be unused
     for example in tqdm(examples):
         example_id = example["id"]
         context = example["context"]
@@ -383,12 +383,11 @@ def answer_from_logits(
                         "prediction_text": best_answer["text"],
                     }
                 )
-                sampled_answers.append(
-                    {
-                        "id": example_id,
-                        "samples": answers,
-                    }
+                sampled_answers["id"].append(example_id)
+                sampled_answers["samples"].append(
+                    [(x["text"], x["logit_score"]) for x in answers]
                 )
+
             else:
                 predicted_answers.append(
                     {"id": example_id, "prediction_text": best_answer["text"]}
