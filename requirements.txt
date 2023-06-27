@@ -1,9 +1,12 @@
-transformers
+transformers @ git+https://github.com/huggingface/transformers.git
+accelerate @ git+https://github.com/huggingface/accelerate.git
+
 datasets
-accelerate
 torch
 numpy
 tqdm
 setfit
 sentence_transformers
 spacy
+tomli
+wandb
