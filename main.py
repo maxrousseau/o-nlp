@@ -4,7 +4,7 @@ import logging
 import argparse
 import tomli
 
-from models import t5_utils, bert_utils, bart_utils, setfit_utils
+from models import t5_utils, bert_utils, bart_utils
 from train import *
 
 
@@ -238,25 +238,25 @@ def main():
         pretrainer = PretrainT5(t5_config)
         pretrainer()
 
-    elif runmode == "train-classifier":
-        setfit_config = setfit_utils.SFCFG(
-            name=model_config["name"],
-            lr=hyperparameter_config["learning_rate"],
-            n_epochs=hyperparameter_config["num_epochs"],
-            model_checkpoint=model_config["checkpoint"],
-            checkpoint_savedir=misc_config["save_dir"],
-            max_length=model_config["max_seq_len"],
-            seed=hyperparameter_config["seed"],
-        )
-        setfit_config = setfit_utils.setup_setfit_training(
-            dataset_config["repository"],
-            setfit_config,
-        )
-        trainer = Setfit(setfit_config)
-        trainer()
+    # elif runmode == "train-classifier":
+    #     setfit_config = setfit_utils.SFCFG(
+    #         name=model_config["name"],
+    #         lr=hyperparameter_config["learning_rate"],
+    #         n_epochs=hyperparameter_config["num_epochs"],
+    #         model_checkpoint=model_config["checkpoint"],
+    #         checkpoint_savedir=misc_config["save_dir"],
+    #         max_length=model_config["max_seq_len"],
+    #         seed=hyperparameter_config["seed"],
+    #     )
+    #     setfit_config = setfit_utils.setup_setfit_training(
+    #         dataset_config["repository"],
+    #         setfit_config,
+    #     )
+    #     trainer = Setfit(setfit_config)
+    #     trainer()
 
-    else:
-        assert TypeError
+    # else:
+    #     assert TypeError
 
 
 if __name__ == "__main__":
