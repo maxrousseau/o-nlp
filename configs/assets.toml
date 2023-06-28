@@ -1,0 +1,14 @@
+dir = "assets"
+models = [
+"google/bert_uncased_L-2_H-128_A-2",
+"bert-base-uncased",
+"dmis-lab/biobert-v1.1",
+"microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+"t5-base",
+"razent/SciFive-base-Pubmed_PMC",
+"bart-base",
+"GanjinZero/biobart-base"
+]
+datasets = [
+"m-rousseau/oqa-v1", "squad"
+]
