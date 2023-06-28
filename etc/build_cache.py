@@ -34,7 +34,6 @@ def main():
 
         model_path = os.path.join(asset_dir, "models")
         data_path = os.path.join(asset_dir, "datasets")
-        metric_path = os.path.join(asset_dir, "metrics")
 
         os.makedirs(model_path)
         os.makedirs(data_path)
