@@ -6,7 +6,7 @@ models = [
 "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
 "t5-base",
 "razent/SciFive-base-Pubmed_PMC",
-"bart-base",
+"facebook/bart-base",
 "GanjinZero/biobart-base"
 ]
 datasets = [
