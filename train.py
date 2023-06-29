@@ -60,8 +60,6 @@ class BaseTester:
         # for logging purposes...
         self.tokenizer_checkpoint = config.tokenizer_checkpoint
         self.model_checkpoint = config.model_checkpoint
-        self.max_length = config.max_length
-        self.bitfit = config.bitfit
 
         # defined locally
         self.test_dataloader = None
@@ -96,8 +94,6 @@ class BaseTrainer:
         # for logging purposes...
         self.tokenizer_checkpoint = config.tokenizer_checkpoint
         self.model_checkpoint = config.model_checkpoint
-        self.max_length = config.max_length
-        self.bitfit = config.bitfit
 
         self.train_dataset = config.train_dataset
         self.val_dataset = config.val_dataset
@@ -139,6 +135,21 @@ class BaseTrainer:
         self.val_dataloader = None
         self.test_dataloader = None
 
+        self.timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        self.output_dir = os.path.abspath(
+            "./outputs/{}-{}".format(self.name, self.timestamp)
+        )
+
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        else:
+            raise OSError("Output directory already exists")  # delete?
+
+        logfile = os.path.join(self.output_dir, "train_info.log")
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+
     def seed_worker(self, worker_id):
         worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
@@ -162,6 +173,40 @@ class FinetuneT5(BaseTrainer):
         super().__init__(config)
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
+        s = """Training run initialized
+
+T5-like fine tuning configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Max answer length : {}
+        Padding : {}
+        Stride : {}
+        Hyperparameters :
+                lr={}
+                lr_scheduler={}
+                num_epochs={}
+                batch_size={}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_seq_length,
+            self.max_ans_length,
+            self.padding,
+            self.stride,
+            self.lr,
+            self.lr_scheduler,
+            self.num_epochs,
+            self.train_batch_size,
+            self.output_dir,
+        )
+
+        self.logger.info(s)
 
     def get_dataloaders(self):
         train_tensor = self.train_batches.remove_columns(["example_id"])
@@ -230,10 +275,9 @@ class FinetuneT5(BaseTrainer):
         # We start the fine-tuning code here, essentially we feed it a model and some data and it trains it and
         # logs the loss/results/weigths that is all....
         self.get_dataloaders()
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        save_path = os.path.abspath(
-            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
+        checkpoint_path_bestf1 = os.path.join(self.output_dir, "checkpoint-bestf1")
+        checkpoint_path_end = os.path.join(self.output_dir, "checkpoint-end")
+
         wandb.init(
             project="o-nlp_experiments",
             config={
@@ -311,11 +355,22 @@ class FinetuneT5(BaseTrainer):
             # save the best model
             if f1_score > best_f1:
                 best_f1 = f1_score
-                self.save_model(save_path)
-                self.logger.info("new best model saved!")
+                self.save_model(checkpoint_path_bestf1)
+                self.logger.info("New save with f1 = {}".format(best_f1))
 
-        self.logger.info("Best model f1 = {}".format(best_f1))
-        return save_path
+        self.save_model(checkpoint_path_end)
+        self.logger.info(
+            "Best {} f1 = {} localted at {}".format(
+                self.name, best_f1, checkpoint_path_bestf1
+            )
+        )
+
+        return {
+            "best_val_f1": best_f1,
+            "checkpoint_bestf1": checkpoint_path_bestf1,
+            "checkpoint_end": checkpoint_path_end,
+            "n_step": steps,
+        }
 
 
 class TaskDistillationBERT(BaseTrainer):
@@ -969,20 +1024,8 @@ class FinetuneBERT(BaseTrainer):
 
     def __init__(self, config):
         super().__init__(config)
-        self.timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        self.output_dir = os.path.abspath(
-            "./outputs/{}-{}".format(self.name, self.timestamp)
-        )
-
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-        else:
-            raise OSError("Output directory already exists")  # delete?
-
-        logfile = os.path.join(self.output_dir, "train_info.log")
-        fh = logging.FileHandler(logfile)
-        fh.setLevel(logging.DEBUG)
-        self.logger.addHandler(fh)
+        self.max_length = config.max_length
+        self.bitfit = config.bitfit
         s = """Training run initialized
 
 BERT-like fine tuning configuration
@@ -1155,8 +1198,8 @@ BERT-like fine tuning configuration
             )
 
             if f1_score > best_f1:
-                self.save_model(checkpoint_path_bestf1)
                 best_f1 = f1_score
+                self.save_model(checkpoint_path_bestf1)
                 self.logger.info("New save with f1 = {}".format(best_f1))
 
         self.save_model(checkpoint_path_end)
@@ -1183,6 +1226,40 @@ class FinetuneBART(BaseTrainer):
         super().__init__(config)
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
+        s = """Training run initialized
+
+BART-like fine tuning configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Max answer length : {}
+        Padding : {}
+        Stride : {}
+        Hyperparameters :
+                lr={}
+                lr_scheduler={}
+                num_epochs={}
+                batch_size={}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_seq_length,
+            self.max_ans_length,
+            self.padding,
+            self.stride,
+            self.lr,
+            self.lr_scheduler,
+            self.num_epochs,
+            self.train_batch_size,
+            self.output_dir,
+        )
+
+        self.logger.info(s)
 
     def __get_dataloaders(self):
         train_tensor = self.train_batches.remove_columns(["example_id"])
@@ -1245,10 +1322,8 @@ class FinetuneBART(BaseTrainer):
     def __call__(self):
         self.__get_dataloaders()
 
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        save_path = os.path.abspath(
-            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
+        checkpoint_path_bestf1 = os.path.join(self.output_dir, "checkpoint-bestf1")
+        checkpoint_path_end = os.path.join(self.output_dir, "checkpoint-end")
 
         best_f1 = -1
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
@@ -1313,17 +1388,25 @@ class FinetuneBART(BaseTrainer):
                 {"val_f1": f1_score, "train_loss": np.array(losses["train"]).mean()}
             )
 
-            # checkpointing (only best_val)
+            # save the best model
             if f1_score > best_f1:
-                self.save_model(save_path)
                 best_f1 = f1_score
+                self.save_model(checkpoint_path_bestf1)
                 self.logger.info("New save with f1 = {}".format(best_f1))
 
+        self.save_model(checkpoint_path_end)
         self.logger.info(
-            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
+            "Best {} f1 = {} localted at {}".format(
+                self.name, best_f1, checkpoint_path_bestf1
+            )
         )
 
-        return save_path
+        return {
+            "best_val_f1": best_f1,
+            "checkpoint_bestf1": checkpoint_path_bestf1,
+            "checkpoint_end": checkpoint_path_end,
+            "n_step": steps,
+        }
 
 
 class EvaluateBERT(BaseTester):
@@ -1331,7 +1414,8 @@ class EvaluateBERT(BaseTester):
 
     def __init__(self, config, output_dir=None):
         super().__init__(config)
-
+        self.max_length = config.max_length
+        self.bitfit = config.bitfit
         if output_dir == None:
             timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
             self.logfile = os.path.abspath(
@@ -1349,10 +1433,9 @@ class EvaluateBERT(BaseTester):
         fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
 
-        # @TODO print log run init like in the bert training
         s = """Evaluation run initialized
 
-BERT-like fine tuning configuration
+BERT-like evaluation configuration
 ************************************
         Name : {}
         Model checkpoint : {}
@@ -1454,20 +1537,53 @@ BERT-like fine tuning configuration
 class EvaluateBART(BaseTester):
     """ """
 
-    def __init__(self, config):
+    def __init__(self, config, output_dir=None):
         super().__init__(config)
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
 
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
-        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
-        # create logger with 'spam_application'
+        if output_dir == None:
+            timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+            self.logfile = os.path.abspath(
+                "evaluation-{}-{}.log".format(self.name, timestamp)
+            )
+            self.resultfile = os.path.join(output_dir, "results.json")
+        else:
+            self.logfile = os.path.join(output_dir, "evaluation.log")
+            self.resultfile = os.path.join(output_dir, "results.json")
+
         self.logger = logging.getLogger("eval_logger")
         self.logger.setLevel(logging.DEBUG)
         # create file handler which logs even debug messages
-        fh = logging.FileHandler(logfile)
+        fh = logging.FileHandler(self.logfile)
         fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
+
+        s = """Evaluation run initialized
+
+BART-like evaluation configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Max answer length : {}
+        Padding : {}
+        Stride : {}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_seq_length,
+            self.max_ans_length,
+            self.padding,
+            self.stride,
+            output_dir,
+        )
+
+        self.logger.info(s)
 
     def get_dataloaders(self):
         label_pad_token_id = -100
@@ -1528,29 +1644,71 @@ class EvaluateBART(BaseTester):
             )
         )
 
-        if return_answers:
-            return predictions
+        results = {
+            "em": em,
+            "f1": f1_score,
+            "predicted_answers": predicted_answers,
+        }
 
-        return f1_score, em
+        # SAVE results as json
+        with open(self.resultfile, "w") as fp:
+            json.dump(results, fp)
+
+        self.logger.info("Evaluation results saved at {}".format(self.resultfile))
+
+        return results
 
 
 class EvaluateT5(BaseTester):
     """ """
 
-    def __init__(self, config):
+    def __init__(self, config, output_dir=None):
         super().__init__(config)
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
 
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
-        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
-        # create logger with 'spam_application'
+        if output_dir == None:
+            timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+            self.logfile = os.path.abspath(
+                "evaluation-{}-{}.log".format(self.name, timestamp)
+            )
+            self.resultfile = os.path.join(output_dir, "results.json")
+        else:
+            self.logfile = os.path.join(output_dir, "evaluation.log")
+            self.resultfile = os.path.join(output_dir, "results.json")
+
         self.logger = logging.getLogger("eval_logger")
         self.logger.setLevel(logging.DEBUG)
         # create file handler which logs even debug messages
-        fh = logging.FileHandler(logfile)
+        fh = logging.FileHandler(self.logfile)
         fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
+
+        s = """Evaluation run initialized
+
+T5-like evaluation configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Max answer length : {}
+        Padding : {}
+        Stride : {}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_seq_length,
+            self.max_ans_length,
+            self.padding,
+            self.stride,
+            output_dir,
+        )
+
+        self.logger.info(s)
 
     def get_dataloaders(self):
         label_pad_token_id = -100
@@ -1573,7 +1731,7 @@ class EvaluateT5(BaseTester):
         self.logger.info("Test and validation dataloaders created")
 
     @torch.no_grad()
-    def __call__(self, return_answers=False):
+    def __call__(self):
         self.get_dataloaders()
         accelerator = Accelerator()
         (
@@ -1587,7 +1745,7 @@ class EvaluateT5(BaseTester):
         for i, batch in enumerate(tqdm(self.test_dataloader)):
             outputs = self.model.generate(
                 **batch,
-                max_length=25,
+                max_length=self.max_ans_length,
                 num_beams=1,
             )
             for i in outputs:
@@ -1609,10 +1767,20 @@ class EvaluateT5(BaseTester):
                 "*" * 50, self.name, f1_score, em, "*" * 50
             )
         )
-        if return_answers:
-            return predictions
 
-        return f1_score, em
+        results = {
+            "em": em,
+            "f1": f1_score,
+            "predicted_answers": predicted_answers,
+        }
+
+        # SAVE results as json
+        with open(self.resultfile, "w") as fp:
+            json.dump(results, fp)
+
+        self.logger.info("Evaluation results saved at {}".format(self.resultfile))
+
+        return results
 
 
 # class Setfit(SetFitTrainer):

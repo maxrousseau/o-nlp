@@ -53,9 +53,16 @@ def main():
             dataset_config["repository"],
             t5_config,
         )
-        print(t5_config)
         tuner = FinetuneT5(t5_config)
-        tuner()
+        run_state = tuner()
+
+        if config["mode"]["eval_after_training"]:
+            t5_config.model_checkpoint = run_state["checkpoint_bestf1"]
+            t5_config = t5_utils.setup_evaluate_t5(
+                dataset_config["repository"], t5_config
+            )
+            evaluater = EvaluateT5(t5_config, output_dir=tuner.output_dir)
+            evaluater()
 
     elif runmode == "t5-evaluate":
         t5_config = t5_utils.T5CFG(
@@ -67,8 +74,6 @@ def main():
             seed=hyperparameter_config["seed"],
         )
         t5_config = t5_utils.setup_evaluate_t5(dataset_config["repository"], t5_config)
-        # @HERE :: make sure setup function is good, then finish training loop
-        print(t5_config)
         evaluator = EvaluateT5(t5_config)
         evaluator()
 
@@ -89,10 +94,16 @@ def main():
             dataset_config["repository"],
             bart_config,
         )
-        # @HERE :: make sure setup function is good, then finish training loop
-        print(bart_config)
         tuner = FinetuneBART(bart_config)
-        tuner()
+        run_state = tuner()
+
+        if config["mode"]["eval_after_training"]:
+            bart_config.model_checkpoint = run_state["checkpoint_bestf1"]
+            bart_config = bart_utils.setup_evaluate_bart(
+                dataset_config["repository"], bart_config
+            )
+            evaluater = EvaluateBART(bart_config, output_dir=tuner.output_dir)
+            evaluater()
 
     elif runmode == "bart-evaluate":
         bart_config = bart_utils.BARTCFG(
@@ -126,7 +137,6 @@ def main():
         bert_config = bert_utils.setup_pretrain_bert(
             dataset_config["repository"], bert_config
         )
-        print(bert_config)
         tuner = PretrainBERT(bert_config)
         tuner()
 
@@ -150,10 +160,6 @@ def main():
         )
         tuner = FinetuneBERT(bert_config)
         run_state = tuner()
-        # get best checkpoint
-        # @TODO @HERE :: fix outputs of eval and then test out full loop
-        # once that's done start polishing up the bert class then move to all other model
-        #       training classes
         if config["mode"]["eval_after_training"]:
             bert_config.model_checkpoint = run_state["checkpoint_bestf1"]
             bert_config = bert_utils.setup_evaluate_oqa(

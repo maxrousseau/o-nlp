@@ -1,0 +1,29 @@
+[mode]
+runmode = "t5-finetune"
+eval_after_training = true
+
+[model]
+name = "t5-tiny-testing"
+max_seq_len = 256
+max_ans_len = 32
+checkpoint = "test-assets/models/google/t5-efficient-tiny"
+bitfit = false
+
+
+[dataset]
+repository = "test-assets/datasets/m-rousseau/oqa-v1"
+
+
+[tokenizer]
+checkpoint = "test-assets/models/google/t5-efficient-tiny"
+
+[hyperparameters]
+learning_rate = 2e-5
+learning_rate_scheduler = true
+num_epochs = 1
+training_batch_size = 2
+validation_batch_size = 2
+seed = 0
+
+[misc]
+save_dir = "./"

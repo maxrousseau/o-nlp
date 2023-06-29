@@ -1,0 +1,28 @@
+[mode]
+runmode = "bart-finetune"
+eval_after_training = true
+
+[model]
+name = "bart-testing"
+max_seq_len = 256
+max_ans_len = 32
+checkpoint = "test-assets/models/facebook/bart-base"
+
+
+[dataset]
+repository = "test-assets/datasets/m-rousseau/oqa-v1"
+
+
+[tokenizer]
+checkpoint = "test-assets/models/facebook/bart-base"
+
+[hyperparameters]
+learning_rate = 2e-5
+learning_rate_scheduler = true
+num_epochs = 1
+training_batch_size = 2
+validation_batch_size = 2
+seed = 0
+
+[misc]
+save_dir = "./"
