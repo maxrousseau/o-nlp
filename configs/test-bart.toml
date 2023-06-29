@@ -20,8 +20,8 @@ checkpoint = "test-assets/models/facebook/bart-base"
 learning_rate = 2e-5
 learning_rate_scheduler = true
 num_epochs = 1
-training_batch_size = 2
-validation_batch_size = 2
+training_batch_size = 4
+validation_batch_size = 4
 seed = 0
 
 [misc]

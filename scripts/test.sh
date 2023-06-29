@@ -3,7 +3,7 @@
 #SBATCH --mem=16G
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --time=0:05:0
+#SBATCH --time=0:10:0
 #SBATCH --mail-user=maximerousseau08@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --gres=gpu:v100:1
@@ -20,4 +20,4 @@ cd ~/projects/def-azouaq/mrouss/o-nlp/
 wandb offline
 nvidia-smi
 
-python main.py configs/test-bert.toml
+python main.py configs/test-bart.toml

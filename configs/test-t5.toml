@@ -7,7 +7,7 @@ name = "t5-tiny-testing"
 max_seq_len = 256
 max_ans_len = 32
 checkpoint = "test-assets/models/google/t5-efficient-tiny"
-bitfit = false
+
 
 
 [dataset]
