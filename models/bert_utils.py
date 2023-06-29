@@ -21,10 +21,9 @@ from transformers import (
 import datasets
 from datasets import Dataset, load_dataset
 
-from evaluate import load
+import evaluate
 
-
-metric = load("squad")
+metric = evaluate.load("metrics/squad")
 
 datasets.utils.logging.set_verbosity_warning
 
@@ -332,7 +331,6 @@ def answer_from_logits(
     @TODO - separate the best answer code from the metric computation -- keeping them in separate functions would make it easier to
     check out the output
     """
-    metric = load("squad")
     n_best = 20
     max_answer_length = 64
 

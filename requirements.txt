@@ -5,8 +5,5 @@ datasets
 torch
 numpy
 tqdm
-setfit
-sentence_transformers
-spacy
 tomli
 wandb

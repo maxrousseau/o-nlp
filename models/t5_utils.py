@@ -31,7 +31,7 @@ import pyarrow as pa
 
 import evaluate
 
-metric = evaluate.load("squad")
+metric = evaluate.load("metrics/squad")
 
 datasets.utils.logging.set_verbosity_warning
 
@@ -412,7 +412,6 @@ def evaluate_pretraining(outputs, target_answers):
         )
         predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
 
-    metric = load_metric("squad")
     m = metric.compute(predictions=predicted_answers, references=theoretical_answers)
 
     return m, predicted_answers, theoretical_answers

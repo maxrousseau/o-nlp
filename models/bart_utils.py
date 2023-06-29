@@ -28,7 +28,7 @@ import pyarrow as pa
 
 import evaluate
 
-metric = evaluate.load("squad")
+metric = evaluate.load("metrics/squad")
 
 datasets.logging.set_verbosity_warning
 
