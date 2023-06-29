@@ -32,6 +32,7 @@ from torch.utils.data import DataLoader
 # tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 # cos_model = AutoModel.from_pretrained("distilbert-base-uncased")
 
+
 # only works if answer is a single sentence
 def get_answer_sentence(example):
     slist = sent_tokenize(example["context"])

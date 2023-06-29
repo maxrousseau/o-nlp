@@ -23,7 +23,6 @@ def main():
         nargs=1,
         help="path to the configuration file",
     )
-    # @TODO :: absl-py seems quite slow, try radicli...
     args = parser.parse_args()
 
     config_path = args.config[0]
@@ -149,9 +148,19 @@ def main():
             dataset_config["repository"],
             bert_config,
         )
-        print(bert_config)
         tuner = FinetuneBERT(bert_config)
-        tuner()
+        run_state = tuner()
+        # get best checkpoint
+        # @TODO @HERE :: fix outputs of eval and then test out full loop
+        # once that's done start polishing up the bert class then move to all other model
+        #       training classes
+        if config["mode"]["eval_after_training"]:
+            bert_config.model_checkpoint = run_state["checkpoint_bestf1"]
+            bert_config = bert_utils.setup_evaluate_oqa(
+                dataset_config["repository"], bert_config
+            )
+            evaluater = EvaluateBERT(bert_config, output_dir=tuner.output_dir)
+            evaluater()
 
     elif runmode == "bert-taskdistil":
         bert_config = bert_utils.TaskDistillationCFG(

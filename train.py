@@ -1,4 +1,6 @@
 import os
+import json
+
 import logging
 import shutil
 from datetime import datetime
@@ -55,6 +57,12 @@ class BaseTester:
         self.stride = config.stride
         self.seed = config.seed
 
+        # for logging purposes...
+        self.tokenizer_checkpoint = config.tokenizer_checkpoint
+        self.model_checkpoint = config.model_checkpoint
+        self.max_length = config.max_length
+        self.bitfit = config.bitfit
+
         # defined locally
         self.test_dataloader = None
 
@@ -84,6 +92,12 @@ class BaseTrainer:
 
         self.tokenizer = config.tokenizer
         self.model = config.model
+
+        # for logging purposes...
+        self.tokenizer_checkpoint = config.tokenizer_checkpoint
+        self.model_checkpoint = config.model_checkpoint
+        self.max_length = config.max_length
+        self.bitfit = config.bitfit
 
         self.train_dataset = config.train_dataset
         self.val_dataset = config.val_dataset
@@ -126,7 +140,7 @@ class BaseTrainer:
         self.test_dataloader = None
 
     def seed_worker(self, worker_id):
-        worker_seed = torch.initial_seed() % 2 ** 32
+        worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
 
@@ -365,21 +379,15 @@ class TaskDistillationBERT(BaseTrainer):
         assert student_end_logits.size() == teacher_end_logits.size()
 
         # NOTE :: idk why the log_softmax for the student?...
-        start_loss = (
-            self.KD_loss(
-                input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
-                target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
-            )
-            * (self.temperature ** 2)
-        )
+        start_loss = self.KD_loss(
+            input=F.log_softmax(student_start_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_start_logits / self.temperature, dim=-1),
+        ) * (self.temperature**2)
 
-        end_loss = (
-            self.KD_loss(
-                input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
-                target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
-            )
-            * (self.temperature ** 2)
-        )
+        end_loss = self.KD_loss(
+            input=F.log_softmax(student_end_logits / self.temperature, dim=-1),
+            target=F.softmax(teacher_end_logits / self.temperature, dim=-1),
+        ) * (self.temperature**2)
 
         loss_ce = (start_loss + end_loss) / 2.0
         print(loss_ce)
@@ -956,12 +964,59 @@ class PretrainBERT(BaseTrainer):
             )
 
 
-# @HERE :: copy this class and adapt for Splinter (see HF)
 class FinetuneBERT(BaseTrainer):
     """ """
 
     def __init__(self, config):
         super().__init__(config)
+        self.timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        self.output_dir = os.path.abspath(
+            "./outputs/{}-{}".format(self.name, self.timestamp)
+        )
+
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        else:
+            raise OSError("Output directory already exists")  # delete?
+
+        logfile = os.path.join(self.output_dir, "train_info.log")
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        self.logger.addHandler(fh)
+        s = """Training run initialized
+
+BERT-like fine tuning configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Padding : {}
+        Stride : {}
+        Hyperparameters :
+                bitfit={}
+                lr={}
+                lr_scheduler={}
+                num_epochs={}
+                batch_size={}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_length,
+            self.padding,
+            self.stride,
+            self.bitfit,
+            self.lr,
+            self.lr_scheduler,
+            self.num_epochs,
+            self.train_batch_size,
+            self.output_dir,
+        )
+
+        self.logger.info(s)
 
     @torch.no_grad()
     def __eval(self, accelerator):
@@ -982,7 +1037,7 @@ class FinetuneBERT(BaseTrainer):
         end_logits = np.concatenate(end_logits)
         start_logits = start_logits[: len(self.val_batches)]
         end_logits = end_logits[: len(self.val_batches)]
-        metrics, unused, unused = bert_utils.answer_from_logits(
+        metrics, _, _, _ = bert_utils.answer_from_logits(
             start_logits,
             end_logits,
             self.val_batches,
@@ -991,7 +1046,7 @@ class FinetuneBERT(BaseTrainer):
         )
         f1_score = metrics["f1"]
         val_loss = np.array(val_losses).mean()
-        print(val_loss)
+
         accelerator.wait_for_everyone()
         return f1_score, val_loss
 
@@ -1025,11 +1080,8 @@ class FinetuneBERT(BaseTrainer):
     def __call__(self):
         # dataloaders
         self.__get_dataloaders()
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        save_path = os.path.abspath(
-            "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-        )
-
+        checkpoint_path_bestf1 = os.path.join(self.output_dir, "checkpoint-bestf1")
+        checkpoint_path_end = os.path.join(self.output_dir, "checkpoint-end")
         # experiment tracking
         wandb.init(
             project="o-nlp_experiments",
@@ -1090,7 +1142,9 @@ class FinetuneBERT(BaseTrainer):
                 progressbar.update(1)
             # eval
             f1_score, val_loss = self.__eval(accelerator)
-            self.logger.info("steps {} : f1 {}".format(steps, f1_score))
+            self.logger.info(
+                "steps {} : f1 {}, val_loss {}".format(steps, f1_score, val_loss)
+            )
             wandb.log(
                 {
                     "val_f1": f1_score,
@@ -1100,18 +1154,25 @@ class FinetuneBERT(BaseTrainer):
                 }
             )
 
-            # checkpointing (best val f1)
             if f1_score > best_f1:
-                self.save_model(save_path)
-                # lowest_val_loss = val_loss
+                self.save_model(checkpoint_path_bestf1)
                 best_f1 = f1_score
                 self.logger.info("New save with f1 = {}".format(best_f1))
 
+        self.save_model(checkpoint_path_end)
+
         self.logger.info(
-            "Best {} f1 = {}, saved at {}".format(self.name, best_f1, save_path)
+            "Best {} f1 = {} localted at {}".format(
+                self.name, best_f1, checkpoint_path_bestf1
+            )
         )
 
-        return save_path
+        return {
+            "best_val_f1": best_f1,
+            "checkpoint_bestf1": checkpoint_path_bestf1,
+            "checkpoint_end": checkpoint_path_end,
+            "n_step": steps,
+        }
 
 
 class FinetuneBART(BaseTrainer):
@@ -1268,18 +1329,50 @@ class FinetuneBART(BaseTrainer):
 class EvaluateBERT(BaseTester):
     """Evaluate model and print results to stdout and export as a log/txt file artifact"""
 
-    def __init__(self, config):
+    def __init__(self, config, output_dir=None):
         super().__init__(config)
 
-        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
-        logfile = os.path.abspath("evaluation-{}-{}.log".format(self.name, timestamp))
+        if output_dir == None:
+            timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+            self.logfile = os.path.abspath(
+                "evaluation-{}-{}.log".format(self.name, timestamp)
+            )
+            self.resultfile = os.path.join(output_dir, "results.json")
+        else:
+            self.logfile = os.path.join(output_dir, "evaluation.log")
+            self.resultfile = os.path.join(output_dir, "results.json")
         # create logger with 'spam_application'
         self.logger = logging.getLogger("eval_logger")
         self.logger.setLevel(logging.DEBUG)
         # create file handler which logs even debug messages
-        fh = logging.FileHandler(logfile)
+        fh = logging.FileHandler(self.logfile)
         fh.setLevel(logging.DEBUG)
         self.logger.addHandler(fh)
+
+        # @TODO print log run init like in the bert training
+        s = """Evaluation run initialized
+
+BERT-like fine tuning configuration
+************************************
+        Name : {}
+        Model checkpoint : {}
+        Tokenizer checkpoint : {}
+        Max sequence length : {}
+        Padding : {}
+        Stride : {}
+        Output directory : {}
+************************************
+        """.format(
+            self.name,
+            self.model_checkpoint,
+            self.tokenizer_checkpoint,
+            self.max_length,
+            self.padding,
+            self.stride,
+            output_dir,
+        )
+
+        self.logger.info(s)
 
     def __get_dataloader(self):
         test_tensor = self.test_batches.remove_columns(["example_id", "offset_mapping"])
@@ -1294,7 +1387,7 @@ class EvaluateBERT(BaseTester):
         self.logger.info("Test dataloader created")
 
     @torch.no_grad()
-    def __call__(self, return_answers=False, multiple_answers=False):
+    def __call__(self, multiple_answers=False):
         # dataloader for test
         self.__get_dataloader()
 
@@ -1342,10 +1435,20 @@ class EvaluateBERT(BaseTester):
             )
         )
 
-        if return_answers:
-            return predicted_answers, sampled_answers
+        results = {
+            "em": em,
+            "f1": f1_score,
+            "predicted_answers": predicted_answers,
+            "sampled_answers": sampled_answers,
+        }
 
-        return f1_score, em
+        # SAVE results as json
+        with open(self.resultfile, "w") as fp:
+            json.dump(results, fp)
+
+        self.logger.info("Evaluation results saved at {}".format(self.resultfile))
+
+        return results
 
 
 class EvaluateBART(BaseTester):
