@@ -1,0 +1,29 @@
+[mode]
+runmode = "bert-finetune"
+eval_after_training = true
+
+[model]
+name = "bert-tiny-testing"
+max_seq_len = 256
+checkpoint = "test-assets/models/google/bert_uncased_L-2_H-128_A-2"
+bitfit = false
+
+
+[dataset]
+repository = "test-assets/datasets/m-rousseau/oqa-v1"
+
+
+[tokenizer]
+checkpoint = "test-assets/models/google/bert_uncased_L-2_H-128_A-2"
+append_special_tokens=false
+
+[hyperparameters]
+learning_rate = 2e-5
+learning_rate_scheduler = true
+num_epochs = 1
+training_batch_size = 2
+validation_batch_size = 2
+seed = 0
+
+[misc]
+save_dir = "./"
