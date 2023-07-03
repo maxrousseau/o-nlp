@@ -20,4 +20,4 @@ cd ~/projects/def-azouaq/mrouss/o-nlp/
 wandb offline
 nvidia-smi
 
-python main.py configs/bert-base.toml
+python main.py configs/bert.toml
