@@ -17,8 +17,6 @@ from transformers import (
     T5Tokenizer,
 )
 
-from load_data import load_mini_oqa, t5_format_mi, denoising_format, load_tgt
-
 from datasets import Dataset, load_metric, load_dataset
 import datasets
 
@@ -135,6 +133,29 @@ def t5_format_mi(dataset):
         {
             "masked_strings": masked_strings.to_pylist(),
             "answer_strings": target_answers.to_pylist(),
+            "id": dataset["id"],
+        }
+    )
+
+
+def denoising_format(dataset):
+    """Format for denoising"""
+    gc.disable()
+    contexts = pa.array(dataset["context"])
+    target = pa.array(dataset["targets"])
+
+    masked_strings = pa.compute.replace_substring(contexts, "[MASK]", "<extra_id_0>")
+    # Important not to include the "." character at the end of the answer otherwise the model generates double dots
+    target_string = pa.compute.binary_join_element_wise(
+        "<extra_id_0> ", target, "<extra_id_1>", ""
+    )
+
+    gc.enable()
+
+    return Dataset.from_dict(
+        {
+            "masked_strings": masked_strings.to_pylist(),
+            "target_strings": target_string.to_pylist(),
             "id": dataset["id"],
         }
     )
