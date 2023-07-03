@@ -12,8 +12,6 @@ from models import t5_utils, bert_utils, bart_utils
 
 from tqdm.auto import tqdm
 
-from tacoma.generator import TacomaCollator
-
 from transformers import (
     get_scheduler,
     DataCollatorForSeq2Seq,
@@ -29,7 +27,7 @@ from accelerate import Accelerator
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Optimizer
+
 
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
