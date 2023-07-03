@@ -1,25 +1,24 @@
 [mode]
 runmode = "bert-finetune"
+eval_after_training = true
 
 [model]
 name = "bert-base-sft-default"
 max_seq_len = 512
-checkpoint = "bert-base-uncased"
+checkpoint = "assets/models/bert-base-uncased"
 bitfit = false
 
 [dataset]
-train_dataset_path="./tmp/bin/train"
-val_dataset_path="./tmp/bin/val"
-test_dataset_path="./tmp/bin/test"
-
+repository = "test-assets/datasets/m-rousseau/oqa-v1"
 
 [tokenizer]
-checkpoint = "bert-base-uncased"
+checkpoint = "assets/models/bert-base-uncased"
+append_special_tokens=false
 
 [hyperparameters]
 learning_rate = 2e-5
 learning_rate_scheduler = true
-num_epochs = 10
+num_epochs = 12
 training_batch_size = 8
 validation_batch_size = 8
 seed = 0

@@ -6,4 +6,7 @@ torch
 numpy
 tqdm
 tomli
+scikit-learn
+pandas
+plotly
 wandb

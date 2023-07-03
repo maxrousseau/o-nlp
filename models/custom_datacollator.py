@@ -1,16 +1,15 @@
-from datasets import Dataset
 import datasets
+
 from transformers import (
     DataCollatorForWholeWordMask,
     AutoTokenizer,
     BertTokenizer,
     BertTokenizerFast,
 )
-import torch
 
 import warnings
 
-from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
+from typing import Any, List, Tuple
 
 import numpy as np
 
@@ -162,8 +161,7 @@ def find_offset(offset_mapping, k, idx):
             return p
 
 
-# @HERE --- begin figuring out the maskable_mappings
-# @BUG --- questions will need to be of length max 128tokens and corpus will need to be chunked into 384
+# questions will need to be of length max 128tokens and corpus will need to be chunked into 384
 def tokenize_question_context(example):
     inputs = tokenizer(
         example["question"],
@@ -260,94 +258,3 @@ def get_answer_sentence(dataset):
     )
     dataset = datasets.concatenate_datasets([dataset, dset_ans], axis=1)
     return dataset
-
-
-def test_case():
-    # let's first create a dummy dataset
-    dataset = Dataset.load_from_disk("../tmp/bin/train").select(range(10))
-    dataset = dataset.remove_columns(["answer_sentence"])
-    dataset = get_answer_sentence(dataset)
-    # dataset = dataset.remove_columns(
-    #    ["answers", "answer_sentence", "topic", "reference", "question"]
-    # )
-    dataset = dataset.rename_column("context", "text")
-
-    # so we can tokenize this using our pretrained bert-like tokenizer, we don't truncate the input as we will split it
-    # into chunks at preprocessing
-    tokenized_dataset = dataset.map(
-        tokenize_corpus, batched=True, remove_columns=["text", "id"]
-    )
-
-    chunked_dataset = tokenized_dataset.map(chunk_corpus, batched=True)
-
-    # apply whole word mask
-    collator = DataCollatorForWholeWordMask(tokenizer, mlm=True, mlm_probability=0.5)
-
-    span_collator = DataCollatorForWholeWordSpan(
-        tokenizer, mlm=True, mlm_probability=0.5
-    )
-    # tensor = tokenizer.encode(test_string, return_tensors="pt")
-    mlm_dataset = collator(
-        chunked_dataset
-    )  # gives us masked input_ids and our original labels
-
-    span_dataset = span_collator(chunked_dataset)
-
-    # randmoly... basically I can replace 'random.shuffle(cand_indexes)' by a function which calls a sentence classifier!
-
-    # ... and then begin implementation of the span datacollator which should be a simple modification of the call
-    # function from the whole word mask collator
-    tokenized_dataset = dataset.map(
-        tokenize_question_context, batched=False, remove_columns=dataset.column_names
-    )
-    # verify that the masking_mappings are properly applied to the target sentence and the question
-    # apply mappings to question and to sentence then verify that they match with the ones from the dataset
-
-    input_ids = torch.Tensor(tokenized_dataset["input_ids"][0]).int()
-    mask = torch.Tensor(tokenized_dataset["mask_mappings"][0]).int()
-    mask = mask.bool()
-
-    # np.array([0, 1, 1, 0, 0, 2, 2])
-    # (a == 1).astype(int)
-
-    targets = torch.masked_select(input_ids, mask).numpy()
-
-    # @HERE - apply Bool based mask based on the value 1 or 2
-
-    # after we get the maskable ids, determine possible start points by looking at lenght of the list - span
-    # length. then randomize that sublist, sample the mask tokens and apply masks as in the whole word span collator.
-
-    # @NOTE: final format for DataCollatorMageTuning -> dataset {question, chunk, } -> tokenized_dataset { "input_ids", "mask_mapping",
-    # "attention_mask", "word_ids", "token_type_ids" }
-
-
-def DataCollatorMageTuning(DataCollatorForWholeWordMask):
-    """
-        modify from the span masking collator
-
-    #@HERE - STEP 1 preprocessing the questions and text chunks identify maskable sequences
-        I need to add a column for maskable sequences [0, 1, 2] # 0 no mask, 1 target sentence, 2 question :: tokenize
-        sample dataset above with question and context to identify how to apply this...
-
-        Algo:
-        for each sample:
-
-            if mask_question:
-                    maskable_ids = rand(1 or 2) (convert to bool matrix)
-            else:
-                    maskable_ids = 1 (convert to bool matrix)
-
-        -> cand_word_ids = get the word_ids of of maskable_ids
-        -> span_length = poisson(12)
-
-        if span_length >= len_cand_word_ids:
-            while span_len >= len_cand_word_ids:
-                    span_length = poisson(12)
-
-        -> cand_start_ids = cand_word_ids[:span_length]
-        -> shuffle(cand_start_ids)
-        -> select mask word ids (see code above)
-
-        endfor
-
-    """
