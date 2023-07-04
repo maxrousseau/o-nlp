@@ -2,16 +2,12 @@
 runmode = "t5-finetune"
 
 [model]
-name = "bart-base-sft-default"
+name = "t5-base-sft-default"
 max_seq_len = 768
 checkpoint = "t5-base"
-bitfit = false
 
 [dataset]
-train_dataset_path="./tmp/bin/train"
-val_dataset_path="./tmp/bin/val"
-test_dataset_path="./tmp/bin/test"
-
+repository = "test-assets/datasets/m-rousseau/oqa-v1"
 
 [tokenizer]
 checkpoint = "t5-base"
@@ -19,7 +15,7 @@ checkpoint = "t5-base"
 [hyperparameters]
 learning_rate = 1e-4
 learning_rate_scheduler = false
-num_epochs = 10
+num_epochs = 12
 training_batch_size = 4
 validation_batch_size = 4
 seed = 0
