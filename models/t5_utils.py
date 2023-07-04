@@ -124,7 +124,7 @@ def t5_format_mi(dataset):
     )
     # Important not to include the "." character at the end of the answer otherwise the model generates double dots
     target_answers = pa.compute.binary_join_element_wise(
-        "<extra_id_0> ", answers, "<extra_id_1>", ""
+        "<extra_id_0>", answers, "<extra_id_1>", ""
     )
 
     gc.enable()
@@ -132,7 +132,8 @@ def t5_format_mi(dataset):
     return Dataset.from_dict(
         {
             "masked_strings": masked_strings.to_pylist(),
-            "answer_strings": target_answers.to_pylist(),
+            "target_strings": target_answers.to_pylist(),
+            "answer_strings": answers.to_pylist(),
             "id": dataset["id"],
         }
     )
@@ -147,7 +148,7 @@ def denoising_format(dataset):
     masked_strings = pa.compute.replace_substring(contexts, "[MASK]", "<extra_id_0>")
     # Important not to include the "." character at the end of the answer otherwise the model generates double dots
     target_string = pa.compute.binary_join_element_wise(
-        "<extra_id_0> ", target, "<extra_id_1>", ""
+        "<extra_id_0>", target, "<extra_id_1>", ""
     )
 
     gc.enable()
@@ -237,7 +238,7 @@ def preprocess_training(examples, tokenizer, padding, max_seq_length, max_ans_le
     """preprocess vaildation for mask infilling QA"""
 
     # @TODO :: look at fsbart paper for the t5 preprocessing...
-    source, target = examples["masked_strings"], examples["answer_strings"]
+    source, target = examples["masked_strings"], examples["target_strings"]
     source_tokenized = tokenizer(
         source,
         padding=padding,
@@ -397,6 +398,7 @@ def clean_outputs(output_ids, tokenizer):
     if stop_token != -1:
         answer = answer[:stop_token]
 
+    answer = answer.strip()
     return answer
 
 
@@ -404,6 +406,8 @@ def evaluate(outputs, target_answers):
     """..."""
     theoretical_answers = []
     predicted_answers = []
+
+    # DEBUG_COMP = []
 
     for idx, predicted_answer in outputs:
         label_answer = target_answers.filter(lambda sample: sample["id"] == idx)[
@@ -413,6 +417,10 @@ def evaluate(outputs, target_answers):
             {"id": idx, "answers": {"answer_start": [], "text": label_answer}}
         )
         predicted_answers.append({"id": idx, "prediction_text": predicted_answer})
+
+        # DEBUG_COMP.append(
+        #     (predicted_answer, label_answer, predicted_answer == label_answer)
+        # )
 
     m = metric.compute(predictions=predicted_answers, references=theoretical_answers)
 

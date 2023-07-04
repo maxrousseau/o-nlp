@@ -7,7 +7,8 @@ models = [
 "t5-base",
 "razent/SciFive-base-Pubmed_PMC",
 "facebook/bart-base",
-"GanjinZero/biobart-base"
+"GanjinZero/biobart-base",
+"m-rousseau/pubmedbert-base-squad2ep"
 ]
 datasets = [
 "m-rousseau/oqa-v1", "squad"

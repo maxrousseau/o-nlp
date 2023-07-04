@@ -1545,7 +1545,7 @@ class EvaluateBART(BaseTester):
             self.logfile = os.path.abspath(
                 "evaluation-{}-{}.log".format(self.name, timestamp)
             )
-            self.resultfile = os.path.join(output_dir, "results.json")
+            self.resultfile = os.path.join("./", "results.json")
         else:
             self.logfile = os.path.join(output_dir, "evaluation.log")
             self.resultfile = os.path.join(output_dir, "results.json")
@@ -1645,7 +1645,7 @@ BART-like evaluation configuration
         results = {
             "em": em,
             "f1": f1_score,
-            "predicted_answers": predicted_answers,
+            "predicted_answers": predictions,
         }
 
         # SAVE results as json
@@ -1670,7 +1670,7 @@ class EvaluateT5(BaseTester):
             self.logfile = os.path.abspath(
                 "evaluation-{}-{}.log".format(self.name, timestamp)
             )
-            self.resultfile = os.path.join(output_dir, "results.json")
+            self.resultfile = os.path.join("./", "results.json")
         else:
             self.logfile = os.path.join(output_dir, "evaluation.log")
             self.resultfile = os.path.join(output_dir, "results.json")
@@ -1769,7 +1769,7 @@ T5-like evaluation configuration
         results = {
             "em": em,
             "f1": f1_score,
-            "predicted_answers": predicted_answers,
+            "predicted_answers": predictions,
         }
 
         # SAVE results as json
@@ -1779,48 +1779,3 @@ T5-like evaluation configuration
         self.logger.info("Evaluation results saved at {}".format(self.resultfile))
 
         return results
-
-
-# class Setfit(SetFitTrainer):
-#     """ """
-
-#     def __init__(self, config):
-#         super().__init__(
-#             model=config.model,
-#             train_dataset=config.train_dataset,
-#             eval_dataset=config.val_dataset,
-#             loss_class=CosineSimilarityLoss,
-#             metric="accuracy",
-#             batch_size=12,
-#             learning_rate=config.lr,
-#             num_iterations=20,
-#             num_epochs=config.n_epochs,
-#             seed=config.seed,
-#         )
-#         self.checkpoint_savedir = config.checkpoint_savedir
-#         self.max_length = config.max_length
-#         self.name = config.name
-
-#         FORMAT = "[%(levelname)s] :: %(asctime)s @ %(name)s :: %(message)s"
-#         logging.basicConfig(format=FORMAT)
-#         self.logger = logging.getLogger("trainer")
-#         self.logger.setLevel(logging.DEBUG)  # change level if debug or not
-
-#     def save_model(self, path):
-#         """basic model saving where the path is overwrote if"""
-#         if os.path.isfile(path):
-#             shutil.rmtree(path)
-#         self.model._save_pretrained(save_directory=path)
-
-#     def __call__(self):
-#         timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-S")
-#         save_path = os.path.abspath(
-#             "{}{}-{}".format(self.checkpoint_savedir, self.name, timestamp)
-#         )
-
-#         self.train(max_length=self.max_length)
-#         metrics = self.evaluate()
-#         self.save_model(save_path)
-#         self.logger.info(
-#             "Classifier trained, evaluation accuracy: {}".format(metrics["accuracy"])
-#         )

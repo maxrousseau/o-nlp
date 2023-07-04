@@ -1,12 +1,11 @@
 [mode]
-runmode = "bart-finetune"
-eval_after_training = true
+runmode = "bart-evaluate"
 
 [model]
-name = "bart-base-sft-default"
+name = "bart-DEBUG"
 max_seq_len = 1024
 max_ans_len = 256
-checkpoint = "assets/models/facebook/bart-base"
+checkpoint = "outputs/bart-base-sft-default-04-07-2023_09-56-15/checkpoint-bestf1"
 
 [dataset]
 repository = "assets/datasets/m-rousseau/oqa-v1"
@@ -15,10 +14,6 @@ repository = "assets/datasets/m-rousseau/oqa-v1"
 checkpoint = "assets/models/facebook/bart-base"
 
 [hyperparameters]
-learning_rate = 2e-5
-learning_rate_scheduler = false
-num_epochs = 12
-training_batch_size = 4
 validation_batch_size = 4
 seed = 0
 

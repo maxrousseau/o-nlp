@@ -20,5 +20,4 @@ cd ~/projects/def-azouaq/mrouss/o-nlp/
 wandb offline
 nvidia-smi
 
-python main.py configs/biobert_sft.toml
-python main.py configs/pubmedbert_sft.toml
+python main.py configs/bart_sft.toml
