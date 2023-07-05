@@ -110,7 +110,7 @@ def setup_tacoma_training(data_repo, config):
     masking_dataset = load_dataset(data_repo)
     masking_dataset = masking_dataset["train"]
     masking_dataset = masking_dataset.shuffle(seed=config.seed).train_test_split(
-        test_size=0.20
+        test_size=0.05
     )
 
     masking_dataset = masking_dataset.map(
@@ -157,7 +157,7 @@ class TacomaT5(BaseTrainer):
 
     """
 
-    def __init__(self, config, eval_steps=10):
+    def __init__(self, config, eval_steps=100):
         super().__init__(config)
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length

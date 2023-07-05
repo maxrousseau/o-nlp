@@ -76,7 +76,10 @@ class TacomaCollator(DataCollatorForSeq2Seq):
 
         cand_indexes = maskable_word_ids[:-span_length].numpy()
 
-        start_idx = random.randint(0, len(cand_indexes) - 1)
+        if len(cand_indexes) > 1:
+            start_idx = random.randint(0, len(cand_indexes) - 1)
+        else:
+            start_idx = cand_indexes[0]
 
         start_word_id = cand_indexes[start_idx]
         input_ids = example["input_ids"].numpy()
