@@ -3,16 +3,16 @@ runmode = "tacoma"
 eval_after_training = false
 
 [model]
-name = "tacoma-full"
+name = "tacoma-colab"
 max_seq_len = 768
 max_ans_len = 128
-checkpoint = "tacoma-assets/models/t5-base"
+checkpoint = "t5-base"
 
 [dataset]
-repository = "tacoma-assets/m-rousseau/tacoma22k"
+repository = "m-rousseau/tacoma22k"
 
 [tokenizer]
-checkpoint = "tacoma-assets/models/t5-base"
+checkpoint = "t5-base"
 
 [hyperparameters]
 learning_rate = 1e-4

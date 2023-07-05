@@ -1,0 +1,10 @@
+dir = "tacoma-assets"
+models = [
+"t5-base",
+"google/t5-v1_1-base",
+"razent/SciFive-base-Pubmed_PMC",
+"google/flan-t5-base",
+]
+datasets = [
+"m-rousseau/tacoma22k",
+]

@@ -128,7 +128,7 @@ def setup_tacoma_training(data_repo, config):
 
     # __import__("IPython").embed()
 
-    config.train_batches = config.train_dataset.select(range(5000)).remove_columns(
+    config.train_batches = config.train_dataset.remove_columns(
         [
             "question",
             "text",
@@ -137,7 +137,7 @@ def setup_tacoma_training(data_repo, config):
             "valid",
         ]
     )
-    config.val_batches = config.val_dataset.select(range(500)).remove_columns(
+    config.val_batches = config.val_dataset.remove_columns(
         [
             "question",
             "text",
