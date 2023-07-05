@@ -79,8 +79,16 @@ class TacomaCollator(DataCollatorForSeq2Seq):
         if len(cand_indexes) > 1:
             start_idx = random.randint(0, len(cand_indexes) - 1)
             start_word_id = cand_indexes[start_idx]
-        else:
+        elif len(cand_indexes) == 1:
             start_word_id = cand_indexes[0]
+        else:
+            print(
+                f"Empty candidate index\nn_maskable_tokens: {n_maskable_tokens}, span_length : {span_length}"
+            )
+            print(f"maskable_word_ids {maskable_word_ids}")
+            print(f"mask_mapping_bool {mask_mapping_bool}")
+            print(f"cand_indexes {cand_indexes}")
+            assert False
 
         input_ids = example["input_ids"].numpy()
         label = input_ids[start_word_id : start_word_id + span_length]
