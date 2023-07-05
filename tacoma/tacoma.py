@@ -360,3 +360,23 @@ TaCoMa training configuration
             "checkpoint_end": checkpoint_path_end,
             "n_step": num_training_steps,
         }
+
+
+def sanitize(train_batches, tokenizer, model):
+    train_batches.set_format("torch")
+    tacoma_collator = TacomaCollator(
+        tokenizer,
+        model=model,
+        label_pad_token_id=-100,
+        pad_to_multiple_of=8,
+    )
+
+    dataloader = DataLoader(
+        train_batches,
+        collate_fn=tacoma_collator,
+        batch_size=4,
+    )
+    for steps, batch in enumerate(tqdm(dataloader)):
+        None
+        # print("ok")
+        # print(type(batch))

@@ -60,15 +60,17 @@ class TacomaCollator(DataCollatorForSeq2Seq):
 
     def _get_labels(self, example, l=None):
         # count the ones
+
         n_maskable_tokens = torch.bincount(example["mask_mappings"].flatten())[1].item()
+
         span_length = np.random.poisson(l)
 
         if n_maskable_tokens == 0:
             assert False
 
         # resample if over limit of maskable tokens
-        while span_length >= n_maskable_tokens:
-            span_length = np.random.poisson(l)
+        if span_length > n_maskable_tokens:
+            span_length = n_maskable_tokens
 
         # get the possible word ids
         mask_mapping_bool = torch.Tensor(example["mask_mappings"]).int().bool()
@@ -79,16 +81,16 @@ class TacomaCollator(DataCollatorForSeq2Seq):
         if len(cand_indexes) > 1:
             start_idx = random.randint(0, len(cand_indexes) - 1)
             start_word_id = cand_indexes[start_idx]
-        elif len(cand_indexes) == 1:
-            start_word_id = cand_indexes[0]
         else:
-            print(
-                f"Empty candidate index\nn_maskable_tokens: {n_maskable_tokens}, span_length : {span_length}"
-            )
-            print(f"maskable_word_ids {maskable_word_ids}")
-            print(f"mask_mapping_bool {mask_mapping_bool}")
-            print(f"cand_indexes {cand_indexes}")
-            assert False
+            start_word_id = maskable_word_ids[0]
+
+        #     print(
+        #         f"Empty candidate index\nn_maskable_tokens: {n_maskable_tokens}, span_length : {span_length}"
+        #     )
+        #     print(f"maskable_word_ids {maskable_word_ids}")
+        #     print(f"mask_mapping_bool {mask_mapping_bool}")
+        #     print(f"cand_indexes {cand_indexes}")
+        # #            assert False
 
         input_ids = example["input_ids"].numpy()
         label = input_ids[start_word_id : start_word_id + span_length]
