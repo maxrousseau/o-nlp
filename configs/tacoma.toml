@@ -6,13 +6,13 @@ eval_after_training = false
 name = "tacoma-default"
 max_seq_len = 768
 max_ans_len = 128
-checkpoint = "t5-small"
+checkpoint = "t5-base"
 
 [dataset]
 repository = "m-rousseau/tacoma22k"
 
 [tokenizer]
-checkpoint = "t5-small"
+checkpoint = "t5-base"
 
 [hyperparameters]
 learning_rate = 1e-4
