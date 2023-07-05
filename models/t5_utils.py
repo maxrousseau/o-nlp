@@ -17,7 +17,7 @@ from transformers import (
     T5Tokenizer,
 )
 
-from datasets import Dataset, load_metric, load_dataset
+from datasets import Dataset, load_dataset
 import datasets
 
 datasets.utils.logging.set_verbosity_warning

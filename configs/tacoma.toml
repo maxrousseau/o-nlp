@@ -1,0 +1,26 @@
+[mode]
+runmode = "tacoma"
+eval_after_training = false
+
+[model]
+name = "tacoma-default"
+max_seq_len = 768
+max_ans_len = 128
+checkpoint = "t5-small"
+
+[dataset]
+repository = "m-rousseau/tacoma22k"
+
+[tokenizer]
+checkpoint = "t5-small"
+
+[hyperparameters]
+learning_rate = 1e-4
+learning_rate_scheduler = true
+num_epochs = 1
+training_batch_size = 4
+validation_batch_size = 4
+seed = 0
+
+[misc]
+save_dir = "./"

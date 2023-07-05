@@ -7,6 +7,8 @@ import tomli
 from models import t5_utils, bert_utils, bart_utils
 from train import *
 
+from tacoma import tacoma
+
 
 from datasets import Dataset
 
@@ -252,6 +254,26 @@ def main():
         print(t5_config)
         pretrainer = PretrainT5(t5_config)
         pretrainer()
+
+    elif runmode == "tacoma":
+        tacoma_config = tacoma.TACOMA_CFG(
+            name=model_config["name"],
+            lr=hyperparameter_config["learning_rate"],
+            lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
+            n_epochs=hyperparameter_config["num_epochs"],
+            model_checkpoint=model_config["checkpoint"],
+            tokenizer_checkpoint=tokenizer_config["checkpoint"],
+            checkpoint_savedir=misc_config["save_dir"],
+            max_seq_length=model_config["max_seq_len"],
+            max_ans_length=model_config["max_ans_len"],
+            seed=hyperparameter_config["seed"],
+        )
+        tacoma_config = tacoma.setup_tacoma_training(
+            dataset_config["repository"],
+            tacoma_config,
+        )
+        tuner = tacoma.TacomaT5(tacoma_config)
+        run_state = tuner()
 
     # elif runmode == "train-classifier":
     #     setfit_config = setfit_utils.SFCFG(

@@ -695,7 +695,7 @@ class PretrainT5(BaseTrainer):
     @torch.no_grad()
     def __eval(self, losses):
         self.model.eval()
-        # @BUG for some reason this is about 4x slower than training ? Ok Fixed
+
         for i, batch in enumerate(tqdm(self.val_dataloader)):
             outputs = self.model(**batch)
             losses["val"].append(outputs.loss.item())
