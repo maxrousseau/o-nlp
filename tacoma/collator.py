@@ -78,10 +78,10 @@ class TacomaCollator(DataCollatorForSeq2Seq):
 
         if len(cand_indexes) > 1:
             start_idx = random.randint(0, len(cand_indexes) - 1)
+            start_word_id = cand_indexes[start_idx]
         else:
-            start_idx = cand_indexes[0]
+            start_word_id = cand_indexes[0]
 
-        start_word_id = cand_indexes[start_idx]
         input_ids = example["input_ids"].numpy()
         label = input_ids[start_word_id : start_word_id + span_length]
         label = np.insert(label, 0, self.special_0)
