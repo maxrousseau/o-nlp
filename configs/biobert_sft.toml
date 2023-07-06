@@ -3,16 +3,16 @@ runmode = "bert-finetune"
 eval_after_training = true
 
 [model]
-name = "biobert-base-sft-default"
+name = "biobert-base-sft-seed100"
 max_seq_len = 512
-checkpoint = "dmis-lab/biobert-base-cased-v1.2"
+checkpoint = "assets/models/dmis-lab/biobert-v1.1"
 bitfit = false
 
 [dataset]
-repository = "test-assets/datasets/m-rousseau/oqa-v1"
+repository = "assets/datasets/m-rousseau/oqa-v1"
 
 [tokenizer]
-checkpoint = "dmis-lab/biobert-base-cased-v1.2"
+checkpoint = "assets/models/dmis-lab/biobert-v1.1"
 append_special_tokens=false
 
 [hyperparameters]
@@ -21,7 +21,7 @@ learning_rate_scheduler = true
 num_epochs = 12
 training_batch_size = 8
 validation_batch_size = 8
-seed = 0
+seed = 100
 
 [misc]
 save_dir = "./"

@@ -3,7 +3,7 @@ runmode = "t5-finetune"
 eval_after_training = true
 
 [model]
-name = "t5-base-sft-seed0"
+name = "t5-base-sft-seed100"
 max_seq_len = 1024
 max_ans_len = 128
 checkpoint = "assets/models/t5-base"
@@ -20,7 +20,7 @@ learning_rate_scheduler = false
 num_epochs = 12
 training_batch_size = 4
 validation_batch_size = 4
-seed = 0
+seed = 100
 
 [misc]
 save_dir = "./"

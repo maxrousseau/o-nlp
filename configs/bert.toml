@@ -3,7 +3,7 @@ runmode = "bert-finetune"
 eval_after_training = true
 
 [model]
-name = "bert-base-sft-seed0"
+name = "bert-base-sft-seed100"
 max_seq_len = 512
 checkpoint = "assets/models/bert-base-uncased"
 bitfit = false
@@ -21,7 +21,7 @@ learning_rate_scheduler = true
 num_epochs = 12
 training_batch_size = 8
 validation_batch_size = 8
-seed = 0
+seed = 100
 
 [misc]
 save_dir = "./"

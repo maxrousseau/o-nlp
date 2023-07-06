@@ -20,7 +20,7 @@ cd ~/projects/def-azouaq/mrouss/o-nlp/
 wandb offline
 nvidia-smi
 
-# python main.py configs/t5_sft.toml
+python main.py configs/t5_sft.toml
 
 python main.py configs/scifive.toml
 
@@ -30,7 +30,7 @@ python main.py configs/biobart_sft.toml
 
 python main.py configs/bert.toml
 
-python main.py configs/biobert.toml
+python main.py configs/biobert_sft.toml
 
 python main.py configs/pubmedbert_sft.toml
 

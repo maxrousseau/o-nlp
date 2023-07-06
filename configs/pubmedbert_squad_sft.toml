@@ -3,9 +3,9 @@ runmode = "bert-finetune"
 eval_after_training = true
 
 [model]
-name = "pubmedbert-base-sft-seed100"
+name = "pubmedbert-base_squad-sft-seed100"
 max_seq_len = 512
-checkpoint = "assets/models/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
+checkpoint = "mr-assets/models/m-rousseau/pubmedbert-base-squad2ep"
 bitfit = false
 
 [dataset]

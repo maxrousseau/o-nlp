@@ -3,7 +3,7 @@ runmode = "bart-finetune"
 eval_after_training = true
 
 [model]
-name = "biobart-base-sft-seed0"
+name = "biobart-base-sft-seed100"
 max_seq_len = 1024
 max_ans_len = 256
 checkpoint = "assets/models/GanjinZero/biobart-base"
@@ -20,7 +20,7 @@ learning_rate_scheduler = false
 num_epochs = 12
 training_batch_size = 4
 validation_batch_size = 4
-seed = 0
+seed = 100
 
 [misc]
 save_dir = "./"
