@@ -38,6 +38,7 @@ class TACOMA_CFG:
     model_checkpoint: str = ""
     tokenizer_checkpoint: str = ""
     checkpoint_savedir: str = ""
+    gradient_accumulation_steps: int = 4
 
     max_seq_length: int = 512
     max_ans_length: int = 128
@@ -108,7 +109,7 @@ def setup_tacoma_training(data_repo, config):
     )
 
     masking_dataset = load_dataset(data_repo)
-    masking_dataset = masking_dataset["train"]
+    masking_dataset = masking_dataset["train"].select(range(1000))
     masking_dataset = masking_dataset.shuffle(seed=config.seed).train_test_split(
         test_size=0.05
     )
@@ -162,6 +163,7 @@ class TacomaT5(BaseTrainer):
         self.max_ans_length = config.max_ans_length
         self.max_seq_length = config.max_seq_length
         self.eval_steps = eval_steps
+        self.gradient_accumulation_steps = config.gradient_accumulation_steps
         s = """Training run initialized
 
 TaCoMa training configuration
@@ -268,7 +270,9 @@ TaCoMa training configuration
         best_val_loss = 100
 
         optimizer = AdamW(self.model.parameters(), lr=self.lr)
-        num_update_steps_per_epoch = len(self.train_dataloader)
+        num_update_steps_per_epoch = (
+            len(self.train_dataloader) / self.gradient_accumulation_steps
+        )
         num_training_steps = self.num_epochs * num_update_steps_per_epoch
         if self.lr_scheduler:
             lr_scheduler = get_scheduler(
@@ -278,19 +282,17 @@ TaCoMa training configuration
                 num_training_steps=num_training_steps,
             )
 
-        if torch.device != "cpu":
-            # @BUG mixed precision breaks t5
-            # mixed_precision="bf16" ? issues witht T5 models...
-            # accelerator = Accelerator(mixed_precision="fp16")
-            accelerator = Accelerator()
-            (
-                self.model,
-                optimizer,
-                self.train_dataloader,
-                self.val_dataloader,
-            ) = accelerator.prepare(
-                self.model, optimizer, self.train_dataloader, self.val_dataloader
-            )
+        accelerator = Accelerator(
+            gradient_accumulation_steps=self.gradient_accumulation_steps
+        )
+        (
+            self.model,
+            optimizer,
+            self.train_dataloader,
+            self.val_dataloader,
+        ) = accelerator.prepare(
+            self.model, optimizer, self.train_dataloader, self.val_dataloader
+        )
 
         progressbar = tqdm(range(num_training_steps))
 
@@ -302,21 +304,16 @@ TaCoMa training configuration
                 batch.pop("word_ids")
                 batch.pop("mask_mappings")
                 batch.pop("offset_mapping")
-                outputs = self.model(**batch)
-                loss = outputs.loss
-
-                if torch.device != "cpu":
+                with accelerator.accumulate(self.model):
+                    outputs = self.model(**batch)
+                    loss = outputs.loss
                     accelerator.backward(loss)
-                else:
-                    loss.backward()
-
-                train_losses.append(loss.detach().cpu().numpy())
-
-                optimizer.step()
-                if self.lr_scheduler:
-                    lr_scheduler.step()
-                optimizer.zero_grad()
-                progressbar.update(1)
+                    train_losses.append(loss.detach().cpu().numpy())
+                    optimizer.step()
+                    if self.lr_scheduler:
+                        lr_scheduler.step()
+                    optimizer.zero_grad()
+                    progressbar.update(1)
 
                 if steps % self.eval_steps == 0:
                     # run eval

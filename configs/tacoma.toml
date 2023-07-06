@@ -15,6 +15,7 @@ repository = "tacoma-assets/datasets/m-rousseau/tacoma22k"
 checkpoint = "tacoma-assets/models/t5-base"
 
 [hyperparameters]
+gradient_accumulation_steps=4
 learning_rate = 1e-4
 learning_rate_scheduler = true
 num_epochs = 1

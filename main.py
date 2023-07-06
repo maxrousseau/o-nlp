@@ -261,6 +261,9 @@ def main():
             lr=hyperparameter_config["learning_rate"],
             lr_scheduler=hyperparameter_config["learning_rate_scheduler"],
             n_epochs=hyperparameter_config["num_epochs"],
+            gradient_accumulation_steps=hyperparameter_config[
+                "gradient_accumulation_steps"
+            ],
             model_checkpoint=model_config["checkpoint"],
             tokenizer_checkpoint=tokenizer_config["checkpoint"],
             checkpoint_savedir=misc_config["save_dir"],
