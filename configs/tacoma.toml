@@ -3,7 +3,7 @@ runmode = "tacoma"
 eval_after_training = false
 
 [model]
-name = "tacoma-full"
+name = "tacoma22k-gradacc16"
 max_seq_len = 768
 max_ans_len = 128
 checkpoint = "tacoma-assets/models/t5-base"
@@ -15,9 +15,10 @@ repository = "tacoma-assets/datasets/m-rousseau/tacoma22k"
 checkpoint = "tacoma-assets/models/t5-base"
 
 [hyperparameters]
-gradient_accumulation_steps=4
-learning_rate = 1e-4
+gradient_accumulation_steps=16
+learning_rate = 3e-4
 learning_rate_scheduler = true
+
 num_epochs = 1
 training_batch_size = 4
 validation_batch_size = 4

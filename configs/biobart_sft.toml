@@ -3,16 +3,16 @@ runmode = "bart-finetune"
 eval_after_training = true
 
 [model]
-name = "bart-base-sft-seed0"
+name = "biobart-base-sft-seed0"
 max_seq_len = 1024
 max_ans_len = 256
-checkpoint = "assets/models/facebook/bart-base"
+checkpoint = "assets/models/GanjinZero/biobart-base"
 
 [dataset]
 repository = "assets/datasets/m-rousseau/oqa-v1"
 
 [tokenizer]
-checkpoint = "assets/models/facebook/bart-base"
+checkpoint = "assets/models/GanjinZero/biobart-base"
 
 [hyperparameters]
 learning_rate = 2e-5

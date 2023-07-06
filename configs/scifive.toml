@@ -1,21 +1,21 @@
 [mode]
-runmode = "bart-finetune"
+runmode = "t5-finetune"
 eval_after_training = true
 
 [model]
-name = "bart-base-sft-seed0"
+name = "scifive-base-sft-seed0"
 max_seq_len = 1024
-max_ans_len = 256
-checkpoint = "assets/models/facebook/bart-base"
+max_ans_len = 128
+checkpoint = "assets/models/razent/SciFive-base-Pubmed_PMC"
 
 [dataset]
 repository = "assets/datasets/m-rousseau/oqa-v1"
 
 [tokenizer]
-checkpoint = "assets/models/facebook/bart-base"
+checkpoint = "assets/models/razent/SciFive-base-Pubmed_PMC"
 
 [hyperparameters]
-learning_rate = 2e-5
+learning_rate = 1e-4
 learning_rate_scheduler = false
 num_epochs = 12
 training_batch_size = 4

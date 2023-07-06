@@ -1,0 +1,5 @@
+dir = "mr-assets"
+models = [
+"m-rousseau/pubmedbert-base-squad2ep"
+]
+datasets = []

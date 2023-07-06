@@ -4,10 +4,10 @@ runmode = "t5-finetune"
 eval_after_training = true
 
 [model]
-name = "tacoma22k-base-sft-default"
+name = "tacomat5-sft-ga16"
 max_seq_len = 768
 max_ans_len = 128
-checkpoint = "outputs/tacoma-full-05-07-2023_16-57-00/checkpoint-bestval"
+checkpoint = "outputs/tacoma22k-gradacc16-06-07-2023_09-10-40/checkpoint-bestval"
 
 [dataset]
 repository = "assets/datasets/m-rousseau/oqa-v1"
@@ -18,9 +18,9 @@ checkpoint = "assets/models/t5-base"
 [hyperparameters]
 learning_rate = 1e-4
 learning_rate_scheduler = false
-num_epochs = 2
-training_batch_size = 2
-validation_batch_size = 2
+num_epochs = 12
+training_batch_size = 4
+validation_batch_size = 4
 seed = 0
 
 [misc]

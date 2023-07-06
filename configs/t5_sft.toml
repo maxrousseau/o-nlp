@@ -3,8 +3,8 @@ runmode = "t5-finetune"
 eval_after_training = true
 
 [model]
-name = "t5-base-sft-default"
-max_seq_len = 768
+name = "t5-base-sft-seed0"
+max_seq_len = 1024
 max_ans_len = 128
 checkpoint = "assets/models/t5-base"
 
