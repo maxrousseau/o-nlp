@@ -109,7 +109,7 @@ def setup_tacoma_training(data_repo, config):
     )
 
     masking_dataset = load_dataset(data_repo)
-    masking_dataset = masking_dataset["train"].select(range(1000))
+    masking_dataset = masking_dataset["train"]
     masking_dataset = masking_dataset.shuffle(seed=config.seed).train_test_split(
         test_size=0.05
     )
@@ -273,7 +273,10 @@ TaCoMa training configuration
         num_update_steps_per_epoch = (
             len(self.train_dataloader) / self.gradient_accumulation_steps
         )
-        num_training_steps = self.num_epochs * num_update_steps_per_epoch
+        num_training_steps = (
+            self.num_epochs * num_update_steps_per_epoch
+        )  # total number of updates
+        num_total_steps = len(self.train_dataloader) * self.num_epochs
         if self.lr_scheduler:
             lr_scheduler = get_scheduler(
                 "linear",
@@ -294,7 +297,7 @@ TaCoMa training configuration
             self.model, optimizer, self.train_dataloader, self.val_dataloader
         )
 
-        progressbar = tqdm(range(int(num_training_steps)))
+        progressbar = tqdm(range(num_total_steps))
 
         train_losses = []
         for epoch in range(self.num_epochs):
@@ -313,7 +316,7 @@ TaCoMa training configuration
                     if self.lr_scheduler:
                         lr_scheduler.step()
                     optimizer.zero_grad()
-                    progressbar.update(1)
+                progressbar.update(1)
 
                 if steps % self.eval_steps == 0:
                     # run eval
