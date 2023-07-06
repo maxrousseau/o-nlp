@@ -9,7 +9,7 @@ max_ans_len = 128
 checkpoint = "tacoma-assets/models/t5-base"
 
 [dataset]
-repository = "tacoma-assets/m-rousseau/tacoma22k"
+repository = "tacoma-assets/datasets/m-rousseau/tacoma22k"
 
 [tokenizer]
 checkpoint = "tacoma-assets/models/t5-base"

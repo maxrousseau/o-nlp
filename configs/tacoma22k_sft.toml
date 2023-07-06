@@ -1,1 +1,27 @@
 # tacoma22k (beta) fine-tuning for OQA
+[mode]
+runmode = "t5-finetune"
+eval_after_training = true
+
+[model]
+name = "tacoma22k-base-sft-default"
+max_seq_len = 768
+max_ans_len = 128
+checkpoint = "outputs/tacoma-full-05-07-2023_16-57-00/checkpoint-bestval"
+
+[dataset]
+repository = "assets/datasets/m-rousseau/oqa-v1"
+
+[tokenizer]
+checkpoint = "assets/models/t5-base"
+
+[hyperparameters]
+learning_rate = 1e-4
+learning_rate_scheduler = false
+num_epochs = 2
+training_batch_size = 2
+validation_batch_size = 2
+seed = 0
+
+[misc]
+save_dir = "./"
