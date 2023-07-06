@@ -294,7 +294,7 @@ TaCoMa training configuration
             self.model, optimizer, self.train_dataloader, self.val_dataloader
         )
 
-        progressbar = tqdm(range(num_training_steps))
+        progressbar = tqdm(range(int(num_training_steps)))
 
         train_losses = []
         for epoch in range(self.num_epochs):
