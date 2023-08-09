@@ -1419,7 +1419,7 @@ class EvaluateBERT(BaseTester):
             self.logfile = os.path.abspath(
                 "evaluation-{}-{}.log".format(self.name, timestamp)
             )
-            self.resultfile = os.path.join(output_dir, "results.json")
+            self.resultfile = os.path.join("./", "results.json")
         else:
             self.logfile = os.path.join(output_dir, "evaluation.log")
             self.resultfile = os.path.join(output_dir, "results.json")
@@ -1522,6 +1522,7 @@ BERT-like evaluation configuration
             "predicted_answers": predicted_answers,
             "sampled_answers": sampled_answers,
         }
+        print(results)
 
         # SAVE results as json
         with open(self.resultfile, "w") as fp:

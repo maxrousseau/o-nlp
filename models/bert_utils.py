@@ -367,7 +367,9 @@ def answer_from_logits(
                         "text": context[
                             offsets[start_index][0] : offsets[end_index][1]
                         ],
-                        "logit_score": start_logit[start_index] + end_logit[end_index],
+                        "logit_score": float(
+                            start_logit[start_index] + end_logit[end_index]
+                        ),
                     }
                     answers.append(answer)
 
