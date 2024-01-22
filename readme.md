@@ -1,13 +1,17 @@
-# o-nlp
+# 🦷 O-NLP : orthodontic natural language processing
 
-🚧
+This repository contains the code used to conduct fine-tuning on OrthodonticQA (OQA).
 
-## Bugs 🐛
+## Usage
 
-- [ ] T5 accelerate fp16bug? (see with bf16)
+We use TOML to configure the hyper-parameters for the run. The ```config/```
+directory contains the various configurations for the experiments from the
+paper.
 
-## Usage 💻
+```scripts/``` contains examples for usage with a SLURM cluster.
+
+To launch a training run:
 
 ```
-python main.py --TBD=True
+python main.py configs/pubmedbert_sft.toml
 ```
